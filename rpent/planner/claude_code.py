@@ -808,6 +808,12 @@ def _tool_result_to_mcp(tr: Any) -> dict[str, Any]:
             )
 
     response: dict[str, Any] = {"content": content}
+    # Surface toolkit-level failures as MCP errors. Without this every result
+    # looks successful to the SDK, and `_Recorder` promotes a `finish` call to
+    # the run's finish_result even when the handler rejected it.
+    result = getattr(tr, "result", None)
+    if isinstance(result, dict) and result.get("error"):
+        response["isError"] = True
     result_dict = getattr(tr, "result", None)
     if isinstance(result_dict, dict) and result_dict.get("error"):
         response["is_error"] = True

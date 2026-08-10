@@ -136,6 +136,24 @@ def _build_argparser() -> argparse.ArgumentParser:
     return ap
 
 
+def _handoff_message(output_dir, session_no: int, session_max: int) -> str:
+    """Build the opening message for a continuation session."""
+    attempts_dir = Path(output_dir) / "attempts"
+    prior = (
+        sorted(p.name for p in attempts_dir.glob("attempt_*_failed.json"))
+        if attempts_dir.is_dir()
+        else []
+    )
+    return (
+        f"You are agent {session_no} of up to {session_max} on this cell. "
+        f"{len(prior)} attempt(s) by earlier agents are archived in "
+        f"{attempts_dir}/ ({', '.join(prior) if prior else 'none yet'}), and their "
+        "working notes are in the memory inbox under wip/.\n\n"
+        "Read every archive and the working notes before acting. Do not repeat "
+        "failed approaches. Call `reset` first to restore a clean scene."
+    )
+
+
 def main() -> int:
     parser = _build_argparser()
     # Two-phase argparse: first grab --env / --dashboard so we know which
@@ -147,6 +165,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.dashboard and args.interactive:
         parser.error("--dashboard and --interactive cannot be used together")
+    if args.dashboard and getattr(args, "explore", False):
+        parser.error("--dashboard and --explore cannot be used together")
     if args.dashboard:
         from rpent.cli.dashboard import run_dashboard_session
 
@@ -164,7 +184,12 @@ def main() -> int:
     output_dir = init_output_dir(output_dir, verbose=args.verbose)
     logger.info("physical agent cmd: %s", shlex.join([sys.executable, *sys.argv]))
 
-    ensure_resources(env_name)
+    # Preserve the original HF-backed evaluation behavior by default.
+    memory_profile = getattr(args, "memory_profile", "hf")
+    if not getattr(args, "explore", False) and memory_profile == "hf":
+        ensure_resources(env_name)
+    else:
+        logger.info("resources: using local %s memory profile", memory_profile)
 
     dashboard_events = NullDashboardEventSink()
 
@@ -222,6 +247,8 @@ def main() -> int:
         primitives_kwargs=primitives_kwargs,
         video_path=str(Path(output_dir) / "episode.mp4"),
         dashboard_events=dashboard_events,
+        explore=getattr(args, "explore", False),
+        attempts_per_session=getattr(args, "explore_attempts_per_session", 0),
     )
 
     # --- agent loop --------------------------------------------------------
@@ -234,27 +261,78 @@ def main() -> int:
         first_user_msg = await_first_prompt()
         if first_user_msg is None:
             logger.info("no task entered; ending session before start.")
+    # Exploration may hand off between independent planner contexts.
+    sessions = max(1, int(getattr(args, "explore_sessions", 1) or 1))
+    if not getattr(args, "explore", False):
+        sessions = 1
     try:
         if first_user_msg is not None:
             dashboard_events.emit(RunStartedEvent())
+        session_msg = first_user_msg
+        for session_no in range(1, sessions + 1):
+            if session_msg is None:
+                break
+            if session_no > 1:
+                logger.info("=== handing off to agent %d/%d ===", session_no, sessions)
+                planner = build_planner(
+                    args.planner,
+                    output_dir=output_dir,
+                    recipe_tag=recipe_tag,
+                    env_name=env_name,
+                    base_url=args.base_url,
+                    model=args.model,
+                    max_tokens=args.max_tokens,
+                    planner_timeout_s=args.planner_timeout_s,
+                    claude_code_max_budget_usd=args.claude_code_max_budget_usd,
+                    dashboard_events=dashboard_events,
+                    no_images=args.no_images,
+                )
+                system_prompt = prompt_bundle.render(
+                    "system",
+                    variables={
+                        **prompt_vars,
+                        "session_no": session_no,
+                        "session_max": sessions,
+                    },
+                )
+                session_msg = _handoff_message(output_dir, session_no, sessions)
+                toolkit.begin_session()
             result = planner.solve(
                 system_prompt=system_prompt,
-                user_message=first_user_msg,
+                user_message=session_msg,
                 toolkit=toolkit,
                 max_turns=args.max_turns,
                 input_queue=input_queue,
             )
             finish_result = result.finish_result
-            messages = result.messages
+            messages += result.messages
             stats = result.stats
             agent_error = result.error
+            if toolkit.solved():
+                break
+            if agent_error:
+                if (
+                    getattr(args, "explore", False)
+                    and session_no < sessions
+                    and "timed out" in agent_error.lower()
+                ):
+                    logger.warning(
+                        "session %d/%d timed out; continuing with a fresh handoff",
+                        session_no,
+                        sessions,
+                    )
+                    continue
+                break
     except Exception as exc:
-        logger.error("EXCEPTION in agent loop: %s", exc)
-        agent_error = str(exc)
+        agent_error = f"{type(exc).__name__}: {exc}"
+        logger.error("EXCEPTION in agent loop: %s", agent_error)
     finally:
         # Agent-side: flush the episode video before the env+model
         recipe_path = toolkit.write_recipe(recipe_tag)
-        logger.info("recipe: %s", recipe_path)
+        if recipe_path:
+            logger.info("recipe: %s", recipe_path)
+        else:
+            logger.info("recipe: not written (cell unsolved)")
 
         toolkit.close()
         for d in daemons:
@@ -283,7 +361,17 @@ def main() -> int:
     if agent_error:
         logger.error("error: %s", agent_error)
 
-    return 0
+    # Publish environment-specific artifacts after recipe export and shutdown.
+    if env_spec.finalize_run is not None and not agent_error:
+        try:
+            finalized = env_spec.finalize_run(args, run_config)
+            if finalized is not None:
+                logger.info("run finalized: %s", finalized)
+        except Exception as exc:
+            agent_error = f"memory finalization failed: {type(exc).__name__}: {exc}"
+            logger.error("%s", agent_error)
+
+    return 1 if agent_error else 0
 
 
 if __name__ == "__main__":

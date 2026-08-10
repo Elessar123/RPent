@@ -97,6 +97,42 @@ LIBERO-PRO 核心套件一览
 
 如需切换 planner，请参阅 :doc:`configure_planner`。
 
+探索模式与分层评测
+------------------
+
+默认仍为原有单次评测模式。省略 ``--memory-profile`` 时，会继续同步并使用
+Hugging Face memory 和原有 prompt。使用 ``layered`` 可基于本地
+global/suite/task 三层 memory 评测：
+
+.. code-block:: bash
+
+   rpent --env libero --suite libero_10_task --task 0 --seed 1 \
+     --planner codex --memory-profile layered \
+     --memory-dir /path/to/libero-memory
+
+探索模式沿用同一个 Python/CLI 入口。它支持可 reset 的多次尝试和独立
+planner session，并在正常结束后校验、合并 memory，只有 LIBERO 确认成功时
+才发布 task audit/recipe：
+
+.. code-block:: bash
+
+   rpent --env libero --suite libero_10_task --task 0 --seed 0 \
+     --planner api --model anthropic:claude-opus-4-8 \
+     --explore --explore-sessions 3 --explore-attempts-per-session 5 \
+     --memory-dir /path/to/libero-memory
+
+使用 ``--no-auto-merge-memory`` 可保留 inbox，稍后人工审核。也可直接使用
+memory 维护命令：
+
+.. code-block:: bash
+
+   rpent-memory --memory-dir /path/to/libero-memory validate
+   rpent-memory --memory-dir /path/to/libero-memory build-index
+   rpent-memory --memory-dir /path/to/libero-memory merge \
+     --cell 10_task_t0_s0 --output-dir logs/explore_10_task_t0_s0
+
+运行时生成的 memory 数据不应提交到仓库。
+
 进程分工
 --------
 

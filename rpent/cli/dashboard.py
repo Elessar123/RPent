@@ -78,7 +78,8 @@ def run_dashboard_session(
     logger.info("launcher Session config applied: %s", launch_config)
     logger.info("physical agent cmd: %s", shlex.join([sys.executable, *sys.argv]))
 
-    ensure_resources(args.env_name)
+    if getattr(args, "memory_profile", "hf") == "hf":
+        ensure_resources(args.env_name)
     state = DashboardState(
         run_id=f"dashboard-session/{session_root.name}",
         output_dir=session_root,

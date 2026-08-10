@@ -100,6 +100,50 @@ Minimal command
 
 To switch planners, see :doc:`configure_planner`.
 
+Exploration and layered evaluation
+----------------------------------
+
+Evaluation remains the default mode.  Omitting ``--memory-profile`` preserves
+the original Hugging Face resource sync and prompt:
+
+.. code-block:: bash
+
+   rpent --env libero --suite libero_10_task --task 0 --seed 1 \
+     --planner claude_code --memory-profile hf
+
+Use ``layered`` to evaluate against the local global/suite/task corpus without
+overwriting it from Hugging Face:
+
+.. code-block:: bash
+
+   rpent --env libero --suite libero_10_task --task 0 --seed 1 \
+     --planner codex --memory-profile layered
+
+Exploration uses the same CLI, runtime, tools, and planner implementations.  It
+adds resettable attempts and fresh planner sessions, then distils drafts into
+``<memory-dir>/_inbox/<cell>/``.  On normal completion the Python runner
+validates and merges those drafts, publishes a task audit/recipe pair only when
+LIBERO reported success, and rebuilds ``MEMORY.md``:
+
+.. code-block:: bash
+
+   rpent --env libero --suite libero_10_task --task 0 --seed 0 \
+     --planner api --model anthropic:claude-opus-4-8 \
+     --explore --explore-sessions 3 --explore-attempts-per-session 5 \
+     --memory-dir /path/to/local/libero-memory
+
+Pass ``--no-auto-merge-memory`` to retain inbox drafts for manual review.  The
+same publication implementation is available to maintainers directly:
+
+.. code-block:: bash
+
+   rpent-memory --memory-dir /path/to/local/libero-memory validate
+   rpent-memory --memory-dir /path/to/local/libero-memory build-index
+   rpent-memory --memory-dir /path/to/local/libero-memory merge \
+     --cell 10_task_t0_s0 --output-dir logs/explore_10_task_t0_s0
+
+Generated memory is runtime data and is not committed to this repository.
+
 What runs where
 ---------------
 

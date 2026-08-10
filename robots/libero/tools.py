@@ -172,6 +172,15 @@ class LiberoPrimitives:
         if self._recording:
             self.record_frame(obs)
 
+    def reset_episode(self, reason: str = "") -> dict:
+        """Restart an episode and return an explore-tool-compatible result."""
+        self.reset()
+        return {
+            "action": "reset",
+            "reason": reason,
+            "libero_terminated": self.env.episode_done,
+        }
+
     def _vlm_chunk(self, instruction: str):
         """One model forward + ``chunk_size`` env steps. Overrides prompt."""
         self._check_cancelled()
@@ -818,8 +827,21 @@ def write_recipe_from_states(output_dir: str, recipe_tag: str) -> str:
     else:
         states = []
 
+    # Exploration traces include abandoned episodes. A replayable recipe begins
+    # after the last reset, which is the attempt that ultimately succeeded.
+    last_reset = max(
+        (
+            i
+            for i, entry in enumerate(states)
+            if entry and (entry.get("command") or {}).get("action") == "reset"
+        ),
+        default=-1,
+    )
+
     command_events = []
     for step_idx, entry in enumerate(states):
+        if step_idx <= last_reset:
+            continue
         if not entry:
             continue
         command = entry.get("command")
@@ -852,6 +874,15 @@ def write_recipe_from_states(output_dir: str, recipe_tag: str) -> str:
         source_step = int(segment["source_step"])
         event_order = (source_step, int(segment["segment_index"]))
         command_events.append((event_order, command))
+
+    # Never publish a failed trajectory as a recipe. The environment trace is
+    # authoritative; an agent's self-reported finish status is not.
+    solved = any(
+        ((entry or {}).get("result") or {}).get("libero_terminated") is True
+        for entry in states[last_reset + 1 :]
+    )
+    if not solved:
+        return ""
 
     recipe_path = os.path.join(output_dir, f"recipe_{recipe_tag}.jsonl")
     tmp_path = recipe_path + ".tmp"
@@ -1166,6 +1197,26 @@ PRIMITIVE_TOOL_NAMES: tuple[str, ...] = (
 )
 
 TOOLS_SPEC = [
+    {
+        "name": "reset",
+        "description": (
+            "EXPLORE MODE ONLY. Abandon the current episode and restore the "
+            "same initial scene. Archive the failed attempt first and state "
+            "which strategy lever will change in the next attempt."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "description": (
+                        "Why this episode is unrecoverable and what will change."
+                    ),
+                }
+            },
+            "required": ["reason"],
+        },
+    },
     {
         "name": "view_driver_state",
         "description": (

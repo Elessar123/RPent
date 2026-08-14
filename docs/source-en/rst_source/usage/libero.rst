@@ -100,8 +100,8 @@ Minimal command
 
 To switch planners, see :doc:`configure_planner`.
 
-Exploration and layered evaluation
-----------------------------------
+Exploration and local-memory evaluation
+---------------------------------------
 
 Evaluation remains the default mode.  Omitting ``--memory-profile`` preserves
 the original Hugging Face resource sync and prompt:
@@ -111,13 +111,13 @@ the original Hugging Face resource sync and prompt:
    rpent --env libero --suite libero_10_task --task 0 --seed 1 \
      --planner claude_code --memory-profile hf
 
-Use ``layered`` to evaluate against the local global/suite/task corpus without
+Use ``local`` to evaluate against the local global/suite/task corpus without
 overwriting it from Hugging Face:
 
 .. code-block:: bash
 
    rpent --env libero --suite libero_10_task --task 0 --seed 1 \
-     --planner codex --memory-profile layered
+     --planner codex --memory-profile local
 
 Exploration uses the same CLI, runtime, tools, and planner implementations.  It
 adds resettable attempts and fresh planner sessions, then distils drafts into
@@ -132,8 +132,9 @@ LIBERO reported success, and rebuilds ``MEMORY.md``:
      --explore --explore-sessions 3 --explore-attempts-per-session 5 \
      --memory-dir /path/to/local/libero-memory
 
-Pass ``--no-auto-merge-memory`` to retain inbox drafts for manual review.  The
-same publication implementation is available to maintainers directly:
+Pass ``--no-auto-merge-memory`` to retain inbox drafts for manual review.
+Maintainers can validate the corpus, rebuild its index, or merge one reviewed
+inbox cell explicitly with ``rpent-memory``:
 
 .. code-block:: bash
 
@@ -160,7 +161,7 @@ What runs where
   transports (HTTP or socket). It returns only the top compressed PNG mask.
 - **toolkit** (``robots/libero/toolkit.py``) — defines the tools the
   LLM can call: ``pi0_pick`` (fed to Pi0.5), ``move_to``,
-  ``rotate_wrist``, ``back_project``, ``view_driver_state``,
+  ``rotate_wrist``, ``back_project``, ``view_env_state``,
   ``finish``, …
 
 Tools the planner can call
@@ -191,8 +192,10 @@ Physical action tools advance the environment and record new state and images.
   coordinates.
 - ``segment(prompt=... / point=..., ...)`` — use SAM3 to segment an existing
   image with a text or point prompt.
-- ``view_driver_state(step=None)`` — read an existing state and image record.
-- ``view_camera_meta(camera=..., step=None)`` — read existing camera metadata.
+- ``view_env_state(step=-1)`` — read a recorded state and its embedded
+  observation images. Step ``0`` is initial; ``-1`` is latest.
+- ``view_camera_meta(camera=..., step=-1)`` — read camera metadata for a
+  recorded step. Step ``-1`` is latest.
 - ``finish(status, summary)`` — end the current run.
 
 These tools do not advance the environment.
@@ -200,18 +203,34 @@ These tools do not advance the environment.
 Live dashboard
 --------------
 
-Add ``--dashboard`` to start a local monitor. It selects an available
-port and prints the URL in the terminal:
+Add ``--dashboard`` to start a long-lived local Dashboard Session. It
+selects an available port and prints the URL in the terminal:
 
 .. code-block:: bash
 
    rpent --env libero --dashboard \
-     --suite libero_object_swap --task 2 --seed 0 \
      --planner claude_code --model claude-opus-4-8
 
-The dashboard streams reasoning, agentview + wrist camera + Pi0.5
-overlays, and an action timeline. Use
-``--dashboard-language zh-cn`` for the Chinese UI.
+Open the URL, confirm the Session configuration, and click **Start Session**.
+After the shared services are ready, start a TaskRun from the page with:
+
+.. code-block:: text
+
+   /rpent-task libero_object_swap 2 0
+
+The Dashboard launcher supports the ``api``, ``claude_code``, and ``codex``
+planners. Configure ``--planner`` and ``--model`` as for a normal run; see
+:doc:`configure_planner`.
+
+Each TaskRun gets a fresh environment while the VLA and SAM3 services are
+reused by the Session. Submit a new ``/rpent-task`` to start or switch tasks;
+during a run, normal messages steer the agent and Esc requests an interruption.
+Press Ctrl+C in the terminal to stop the Session.
+
+``--dashboard`` cannot be combined with ``--interactive`` or
+``--env-endpoint``. External ``--vla-endpoint`` and ``--sam3-endpoint``
+services remain supported. Use ``--dashboard-language zh-cn`` for the
+Chinese UI.
 
 Bringing your own VLA
 ---------------------

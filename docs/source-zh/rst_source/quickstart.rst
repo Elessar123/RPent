@@ -8,7 +8,7 @@ LIBERO-PRO 仿真资源。下面以 LIBERO-PRO 和 ``claude_code`` planner
 1. 配置 API key 与 checkpoint
 ------------------------------
 
-设置 Anthropic API key、VLA checkpoint 和 SAM 3.0 checkpoint 路径：
+导出 Anthropic API key，然后下载并配置 VLA 和 SAM 3.0 checkpoint：
 
 .. code-block:: bash
 
@@ -18,12 +18,22 @@ LIBERO-PRO 仿真资源。下面以 LIBERO-PRO 和 ``claude_code`` planner
 
    # VLA checkpoint —— 从下面地址下载
    # https://huggingface.co/RLinf/RLinf-Pi05-LIBERO-130-fullshot-SFT
-   export PI05_CHECKPOINT_PATH=/path/to/rlinf-pi05-libero-130-fullshot-sft
+   pip install "huggingface_hub>=0.34,<1.0"
 
-   # SAM 3.0 checkpoint —— 从以下任一地址下载
-   # https://huggingface.co/facebook/sam3
+   hf download RLinf/RLinf-Pi05-LIBERO-130-fullshot-SFT \
+     --exclude optimizer.pt \
+     --local-dir ./checkpoints/RLinf-Pi05-LIBERO-130-fullshot-SFT
+
+   export PI05_CHECKPOINT_PATH=$PWD/checkpoints/RLinf-Pi05-LIBERO-130-fullshot-SFT
+
+   # SAM 3.0 checkpoint —— 从以下地址下载
    # https://modelscope.cn/models/facebook/sam3
-   export SAM3_CHECKPOINT_PATH=/path/to/sam3/sam3.pt
+   pip install -U modelscope
+
+   modelscope download facebook/sam3 \
+     --local-dir ./checkpoints/sam3
+
+   export SAM3_CHECKPOINT_PATH=$PWD/checkpoints/sam3/sam3.pt
 
 2. 跑一个 LIBERO 任务
 ---------------------
@@ -42,13 +52,17 @@ LIBERO-PRO 仿真资源。下面以 LIBERO-PRO 和 ``claude_code`` planner
 3. 通过 Dashboard 查看运行过程
 ------------------------------
 
-添加 ``--dashboard`` 后，RPent 会启动本地 Dashboard 服务，并在终端输出访问地址。打开该地址后，可以先在启动页面确认配置。运行开始后，Dashboard 会实时显示智能体的推理过程、相机与 Pi0 视图、动作时间线和片段回放。使用 ``--dashboard-language zh-cn`` 可切换到中文界面。
+添加 ``--dashboard`` 后，RPent 会启动本地 Dashboard，并在终端输出访问地址：
 
 .. code-block:: bash
 
    rpent --env libero --dashboard --dashboard-language zh-cn \
-     --suite libero_object_swap --task 2 --seed 0 \
      --planner claude_code --model claude-opus-4-8
+
+打开该地址并确认配置；服务就绪后，在页面输入
+``/rpent-task libero_object_swap 2 0`` 启动任务。Dashboard 会实时显示智能体的
+推理过程、相机画面和动作时间线；任务结束后可以继续提交下一任务。使用
+``--dashboard-language zh-cn`` 可切换到中文界面。
 
 关键 CLI 选项
 -------------
@@ -95,7 +109,9 @@ LIBERO-PRO 仿真资源。下面以 LIBERO-PRO 和 ``claude_code`` planner
 1. 终端会先显示 ``env_server``、``vla_server`` 和 ``sam3_server`` 的启动信息。
 2. 智能体的逐轮输出和工具调用会显示在终端中；运行结束时还会显示耗时、token 用量和运行记录的路径。
 3. 启用 Dashboard 后，智能体的输出、相机视图、动作时间线和片段回放也会实时显示在 Dashboard 中。
-4. 默认输出目录为 ``logs/<timestamp>_<suite>_t<task>_s<seed>/``，其中包含 ``transcript_*.json``\ （运行记录）、``states.json``\ （每个环境步的记录）、``recipe_*.jsonl``\ （动作序列）和 ``episode.mp4``\ （回合录像）。
+4. 默认输出目录为 ``logs/<timestamp>_<suite>_t<task>_s<seed>/``，其中包含 ``transcript_*.json``\ （运行记录）、``states.json``\ （``EnvState`` 清单）、``recipe_*.jsonl``\ （动作序列）和 ``episode.mp4``\ （回合录像）。每种逐步工件使用一个与逻辑工件同名的目录，目录内按步骤保存零填充文件，例如 ``agentview_depth.npz/00.npz`` 和 ``agentview_depth.npz/01.npz``；运行级工件仍保存在输出目录根部。
 
-运行结束后，查看 ``states.json`` 的最后一条记录：``libero_terminated`` 为 ``true`` 表示 LIBERO 已判定任务完成；也可以打开 ``episode.mp4`` 复核运行过程。
+通过 Dashboard 或 ``view_env_state(step=-1)`` 查看最终状态；其顶层
+``terminated`` 即为基准任务结果。``states.json`` 是 ``EnvState`` 的内部
+存储，调用方不应直接解析。也可以打开 ``episode.mp4`` 复核运行过程。
 出问题时，参考 :doc:`installation` 页底部提到的四份日志文件。

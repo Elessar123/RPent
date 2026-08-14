@@ -46,7 +46,6 @@ def get_toolkit(
     *,
     primitives_kwargs: dict[str, Any],
     dashboard_events: DashboardEventSink,
-    video_path: str | None = None,
     explore: bool = False,
     attempts_per_session: int = 0,
 ):
@@ -56,7 +55,6 @@ def get_toolkit(
     return LiberoToolkit(
         primitives_kwargs=primitives_kwargs,
         dashboard_events=dashboard_events,
-        video_path=video_path,
         explore=explore,
         attempts_per_session=attempts_per_session,
     )
@@ -79,7 +77,7 @@ def _add_cli_args(parser: argparse.ArgumentParser, use_dashboard: bool) -> None:
                         help="e.g. libero_object_task, libero_spatial_swap")
     parser.add_argument("--task", type=int, default=None, required=required)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--memory-profile", choices=["hf", "layered"], default="hf",
+    parser.add_argument("--memory-profile", choices=["hf", "local"], default="hf",
                         help="Evaluation memory profile (default: hf).")
     parser.add_argument("--memory-dir", default=None,
                         help="Layered memory root (default: resources/libero/memory).")
@@ -147,7 +145,7 @@ def _parse_config(args: argparse.Namespace) -> RunConfig:
         "seed": args.seed,
         "recipe_tag": recipe_tag,
         "mode": "explore" if explore else "eval",
-        "memory_profile": "layered" if explore else args.memory_profile,
+        "memory_profile": "local" if explore else args.memory_profile,
         "memory_dir": str(memory_dir),
         "reference_tag": f"{args.suite.replace('libero_', '')}_t{args.task}_s0",
         # Per-cell inbox: parallel explore runs must not append to a shared file.

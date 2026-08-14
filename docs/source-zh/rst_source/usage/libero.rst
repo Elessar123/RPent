@@ -97,17 +97,17 @@ LIBERO-PRO 核心套件一览
 
 如需切换 planner，请参阅 :doc:`configure_planner`。
 
-探索模式与分层评测
-------------------
+探索模式与本地 Memory 评测
+--------------------------
 
 默认仍为原有单次评测模式。省略 ``--memory-profile`` 时，会继续同步并使用
-Hugging Face memory 和原有 prompt。使用 ``layered`` 可基于本地
+Hugging Face memory 和原有 prompt。使用 ``local`` 可基于本地
 global/suite/task 三层 memory 评测：
 
 .. code-block:: bash
 
    rpent --env libero --suite libero_10_task --task 0 --seed 1 \
-     --planner codex --memory-profile layered \
+     --planner codex --memory-profile local \
      --memory-dir /path/to/libero-memory
 
 探索模式沿用同一个 Python/CLI 入口。它支持可 reset 的多次尝试和独立
@@ -148,7 +148,7 @@ memory 维护命令：
   排名第一的压缩 PNG mask。
 - **toolkit（工具集）** （``robots/libero/toolkit.py``）—— 定义 LLM
   能调用的工具：``pi0_pick``（交给 Pi0.5）、``move_to``、``rotate_wrist``、
-  ``back_project``、``view_driver_state``、``finish``…
+  ``back_project``、``view_env_state``、``finish``…
 
 Planner 能调用的工具
 --------------------
@@ -177,8 +177,10 @@ LIBERO 工具分为物理动作工具和只读工具。
 - ``back_project(row, col, ...)`` —— 将图像像素反投影到世界坐标。
 - ``segment(prompt=... / point=..., ...)`` —— 通过 SAM3 对已有图像进行文本或
   点提示分割。
-- ``view_driver_state(step=None)`` —— 读取已有的状态和图像记录。
-- ``view_camera_meta(camera=..., step=None)`` —— 读取已有的相机元数据。
+- ``view_env_state(step=-1)`` —— 读取已记录的状态和内嵌观测图像；第 0 步为
+  初始状态，``-1`` 表示最新状态。
+- ``view_camera_meta(camera=..., step=-1)`` —— 读取指定步骤的相机元数据；
+  ``-1`` 表示最新状态。
 - ``finish(status, summary)`` —— 结束当前运行。
 
 这些工具不会推进环境。
@@ -186,17 +188,32 @@ LIBERO 工具分为物理动作工具和只读工具。
 Dashboard
 ---------
 
-加上 ``--dashboard`` 可启动本地监控服务。系统会自动选择一个空闲端口，
-并在终端输出访问 URL：
+加上 ``--dashboard`` 可启动长生命周期的本地 Dashboard Session。系统会自动
+选择一个空闲端口，并在终端输出访问 URL：
 
 .. code-block:: bash
 
    rpent --env libero --dashboard \
-     --suite libero_object_swap --task 2 --seed 0 \
      --planner claude_code --model claude-opus-4-8
 
-Dashboard 会实时展示推理过程、agentview 视图、腕部相机视图、Pi0.5
-叠加信息和动作时间线。使用 ``--dashboard-language zh-cn`` 切换中文 UI。
+打开该地址，确认 Session 配置并点击 **Start Session**。共享服务就绪后，在页面
+输入以下命令启动 TaskRun：
+
+.. code-block:: text
+
+   /rpent-task libero_object_swap 2 0
+
+Dashboard launcher 支持 ``api``、``claude_code`` 和 ``codex`` planner。
+``--planner`` 与 ``--model`` 的配置方式和普通运行一致，详见
+:doc:`configure_planner`。
+
+每个 TaskRun 使用独立环境，VLA 和 SAM3 服务由 Session 复用。可通过新的
+``/rpent-task`` 启动或切换任务；运行中也可以发送消息引导智能体，并按 Esc
+请求中断。在终端按 Ctrl+C 可结束 Session。
+
+``--dashboard`` 不能与 ``--interactive`` 或 ``--env-endpoint`` 同时使用；外部
+``--vla-endpoint`` 和 ``--sam3-endpoint`` 服务仍然可用。使用
+``--dashboard-language zh-cn`` 可切换中文 UI。
 
 接入自定义 VLA
 ----------------

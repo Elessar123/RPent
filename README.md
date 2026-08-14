@@ -113,11 +113,20 @@ export ANTHROPIC_API_KEY=sk-xxx
 
 # VLA checkpoint — download from
 # https://huggingface.co/RLinf/RLinf-Pi05-LIBERO-130-fullshot-SFT
-export PI05_CHECKPOINT_PATH=/path/to/rlinf-pi05-libero-130-fullshot-sft
+hf download RLinf/RLinf-Pi05-LIBERO-130-fullshot-SFT \
+  --exclude optimizer.pt \
+  --local-dir ./checkpoints/RLinf-Pi05-LIBERO-130-fullshot-SFT
+
+export PI05_CHECKPOINT_PATH=$PWD/checkpoints/RLinf-Pi05-LIBERO-130-fullshot-SFT
+
 # SAM 3.0 checkpoint — download from
-# https://huggingface.co/facebook/sam3
 # https://modelscope.cn/models/facebook/sam3
-export SAM3_CHECKPOINT_PATH=/path/to/sam3/sam3.pt
+pip install -U modelscope
+
+modelscope download facebook/sam3 \
+  --local-dir ./checkpoints/sam3
+
+export SAM3_CHECKPOINT_PATH=$PWD/checkpoints/sam3/sam3.pt
 export LIBERO_TYPE=pro
 
 # Run one task: libero_object_swap, task 2, seed 0, using Claude Code
@@ -128,14 +137,14 @@ rpent --env libero --suite libero_object_swap --task 2 --seed 0 \
 
 See the [planner docs](https://rpent.readthedocs.io/en/latest/rst_source/usage/configure_planner.html) to configure other planners (`api`, `codex`) and model providers.
 
-### Exploration and layered evaluation
+### Exploration and local-memory evaluation
 
-Evaluation remains the default. Add `--memory-profile layered` to evaluate
+Evaluation remains the default. Add `--memory-profile local` to evaluate
 against a local global/suite/task memory corpus:
 
 ```bash
 rpent --env libero --suite libero_10_task --task 0 --seed 1 \
-  --planner codex --memory-profile layered \
+  --planner codex --memory-profile local \
   --memory-dir /path/to/libero-memory
 ```
 
@@ -163,11 +172,10 @@ rpent --env libero --suite libero_object_swap --task 2 --seed 0 \
 
 ### Live Dashboard
 
-Add `--dashboard` to start a local dashboard server. The command prints the URL in the terminal; open it to confirm the configuration on the launcher screen. Once the run starts, the page streams agent reasoning, camera and Pi0 views, the action timeline, and clip replays. Use `--dashboard-language zh-cn` for the Chinese UI.
+Add `--dashboard` to start a local Dashboard and print its URL in the terminal. Open the URL and confirm the configuration; once the services are ready, start a task with `/rpent-task <suite> <task> <seed>`. The page streams agent reasoning, camera views, and the action timeline, and you can submit another task after the current one finishes. Use `--dashboard-language zh-cn` for the Chinese UI.
 
 ```bash
 rpent --env libero --dashboard --dashboard-language zh-cn \
-  --suite libero_goal_task --task 1 --seed 0 \
   --planner claude_code --model claude-opus-4-8
 ```
 
@@ -196,7 +204,7 @@ For more detailed documentation, see the [RPent documentation](https://rpent.rea
     <tr><td><code>--max-episode-steps</code></td><td><code>10000</code></td><td>Max env steps</td></tr>
     <tr><td><code>--libero-type</code></td><td><code>LIBERO_TYPE</code> or <code>pro</code></td><td>LIBERO variant: <code>standard</code> | <code>pro</code> | <code>plus</code></td></tr>
     <tr><td><code>--cuda-device</code></td><td>inherited</td><td>GPU device exposed to the env / VLA / SAM3 servers</td></tr>
-    <tr><td><code>--dashboard</code></td><td>off</td><td>Start the local dashboard for this run</td></tr>
+    <tr><td><code>--dashboard</code></td><td>off</td><td>Start a local Dashboard</td></tr>
     <tr><td><code>--dashboard-language</code></td><td><code>en</code></td><td>Dashboard UI language: <code>en</code> | <code>zh-cn</code></td></tr>
     <tr><td><code>--env-endpoint</code></td><td>— (spawn)</td><td><code>[protocol://]host:port</code> of an existing env_server (<code>protocol=http|socket</code>, default <code>http</code>). If unset, one is spawned locally.</td></tr>
     <tr><td><code>--vla-endpoint</code></td><td>— (spawn)</td><td><code>[protocol://]host:port</code> of an existing vla_server (same rules). If unset, one is spawned locally.</td></tr>

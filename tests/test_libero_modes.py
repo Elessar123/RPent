@@ -26,15 +26,15 @@ def test_legacy_eval_defaults_to_hf_single_session():
     assert config.prompt_vars["memory_profile"] == "hf"
 
 
-def test_layered_eval_uses_same_entrypoint_and_planner():
+def test_local_eval_uses_same_entrypoint_and_planner():
     spec, args = _parse(
-        "--planner", "codex", "--memory-profile", "layered", "--seed", "3"
+        "--planner", "codex", "--memory-profile", "local", "--seed", "3"
     )
     config = spec.parse_config(args)
 
     assert args.planner == "codex"
     assert config.prompt_vars["mode"] == "eval"
-    assert config.prompt_vars["memory_profile"] == "layered"
+    assert config.prompt_vars["memory_profile"] == "local"
     assert config.prompt_vars["reference_tag"] == "10_task_t0_s0"
 
 
@@ -44,11 +44,11 @@ def test_prompt_profiles_are_isolated():
     hf_vars = {**hf_config.prompt_vars, "output_dir": hf_config.output_dir}
     hf_prompt = spec.prompts.render("system", variables=hf_vars)
 
-    _, layered_args = _parse("--memory-profile", "layered")
-    layered_config = spec.parse_config(layered_args)
-    layered_prompt = spec.prompts.render(
+    _, local_args = _parse("--memory-profile", "local")
+    local_config = spec.parse_config(local_args)
+    local_prompt = spec.prompts.render(
         "system",
-        variables={**layered_config.prompt_vars, "output_dir": layered_config.output_dir},
+        variables={**local_config.prompt_vars, "output_dir": local_config.output_dir},
     )
 
     _, explore_args = _parse("--explore")
@@ -60,7 +60,7 @@ def test_prompt_profiles_are_isolated():
 
     assert "LOCAL SUITE + TASK + GLOBAL" not in hf_prompt
     assert "MULTI-ATTEMPT EXPLORE MODE" not in hf_prompt
-    assert "LOCAL SUITE + TASK + GLOBAL" in layered_prompt
+    assert "LOCAL SUITE + TASK + GLOBAL" in local_prompt
     assert "MULTI-ATTEMPT EXPLORE MODE" in explore_prompt
 
 
@@ -79,7 +79,7 @@ def test_explore_uses_same_api_planner_and_enables_auto_merge(tmp_path):
     assert args.planner == "api"
     assert args.auto_merge_memory is True
     assert config.prompt_vars["mode"] == "explore"
-    assert config.prompt_vars["memory_profile"] == "layered"
+    assert config.prompt_vars["memory_profile"] == "local"
     assert config.prompt_vars["memory_dir"] == str((tmp_path / "memory").resolve())
     assert spec.finalize_run is not None
 
@@ -130,7 +130,9 @@ def test_explore_reset_enforces_attempt_budget():
     toolkit._attempts_per_session = 2
     toolkit._session_attempt = 1
     toolkit._attempt = 4
-    toolkit._step = lambda *args, **kwargs: {"state": {}}
+    toolkit._primitives = type(
+        "Primitives", (), {"reset_episode": lambda self, reason: {"state": {}}}
+    )()
 
     result = toolkit._reset_episode("retry")
 

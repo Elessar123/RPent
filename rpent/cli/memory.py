@@ -1,4 +1,4 @@
-"""Command-line maintenance interface for layered memory."""
+"""Standalone command-line maintenance interface for local memory."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def _parser() -> argparse.ArgumentParser:
         "--memory-dir",
         type=Path,
         default=get_memory_dir("libero"),
-        help="Layered corpus root (default: resources/libero/memory).",
+        help="Local corpus root (default: resources/libero/memory).",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -43,7 +43,7 @@ def main() -> int:
         if problems:
             print("\n".join(problems))
             return 1
-        print("layered memory is valid")
+        print("local memory is valid")
         return 0
     index = build_index(args.memory_dir)
     print(index)

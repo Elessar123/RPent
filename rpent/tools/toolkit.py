@@ -308,9 +308,6 @@ class Toolkit:
     def close(self) -> None:
         """Release the env-side primitives / servers at end of run. Default: no-op."""
 
-    def begin_session(self) -> None:
-        """Called when a fresh agent session takes over. Default: no-op."""
-
     def solved(self) -> bool:
         """Whether the env has reported the task complete.
 

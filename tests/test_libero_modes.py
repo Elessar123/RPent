@@ -4,6 +4,7 @@ import json
 
 from robots.libero.toolkit import LiberoToolkit
 from rpent.cli.main import _build_argparser
+from rpent.dashboard.events import NullDashboardEventSink
 from rpent.envs.base import get_env_spec
 
 
@@ -139,3 +140,42 @@ def test_explore_reset_enforces_attempt_budget():
     assert result["attempt"] == 5
     assert toolkit._session_attempt == 2
     assert toolkit._reset_episode("retry")["error"] == "reset refused"
+
+
+def test_libero_toolkit_uses_custom_state_output_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(LiberoToolkit, "init_primitives_clean", lambda *a, **k: None)
+    monkeypatch.setattr(LiberoToolkit, "_register_libero_tools", lambda *a, **k: None)
+    state_dir = tmp_path / "sessions" / "session_002"
+
+    toolkit = LiberoToolkit(
+        primitives_kwargs={},
+        dashboard_events=NullDashboardEventSink(),
+        explore=True,
+        attempts_per_session=5,
+        state_output_dir=state_dir,
+    )
+    toolkit.state.save("probe.json", {"session": 2}, step=None)
+
+    assert (state_dir / "probe.json").exists()
+    assert not (tmp_path / "probe.json").exists()
+
+
+def test_successful_session_recipe_is_published_at_run_root(tmp_path, monkeypatch):
+    recipe_name = "recipe_10_task_t0_s0.jsonl"
+    toolkit = LiberoToolkit.__new__(LiberoToolkit)
+    toolkit._state = object()
+    call = {}
+    monkeypatch.setattr("robots.libero.toolkit.get_output_dir", lambda: tmp_path)
+
+    def write_recipe(state, recipe_tag, *, output_dir):
+        call.update(state=state, recipe_tag=recipe_tag, output_dir=output_dir)
+        return recipe_name
+
+    monkeypatch.setattr("robots.libero.toolkit.libero_tools.write_recipe_from_states", write_recipe)
+
+    assert toolkit.write_recipe("10_task_t0_s0") == recipe_name
+    assert call == {
+        "state": toolkit._state,
+        "recipe_tag": "10_task_t0_s0",
+        "output_dir": tmp_path,
+    }

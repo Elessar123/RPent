@@ -1,7 +1,9 @@
 """LIBERO + OpenPI tool implementation."""
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -763,7 +765,7 @@ def _is_primitive_action(name: object) -> bool:
     method = getattr(LiberoPrimitives, name, None)
     return method is not None and not bool(getattr(method, "_readonly", False))
 
-def write_recipe_from_states(state: EnvState, recipe_tag: str) -> str:
+def write_recipe_from_states(state: EnvState, recipe_tag: str, *, output_dir: Path | str) -> str:
     """Find a command sequence that gets ``terminated=True``.
 
     Export non-error LIBERO primitive commands and successful segment calls.
@@ -828,11 +830,9 @@ def write_recipe_from_states(state: EnvState, recipe_tag: str) -> str:
         return ""
     command_events.sort(key=lambda event: event[0])
     recipe_name = f"recipe_{recipe_tag}.jsonl"
-    state.save(
-        recipe_name,
-        [command for _, command in command_events],
-        step=None,
-    )
+    recipe_path = Path(output_dir) / recipe_name
+    recipe_path.parent.mkdir(parents=True, exist_ok=True)
+    recipe_path.write_text("".join(json.dumps(command) + "\n" for _, command in command_events))
     return recipe_name
 
 

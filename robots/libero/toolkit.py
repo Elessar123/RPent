@@ -6,6 +6,7 @@ LIBERO primitives (``move_to``, ``pi0_pick``, ``release``, ...) on top.
 from __future__ import annotations
 
 from functools import partial
+from pathlib import Path
 from typing import Any
 
 from robots.libero import tools as libero_tools
@@ -30,14 +31,16 @@ class LiberoToolkit(Toolkit):
         dashboard_events: DashboardEventSink,
         explore: bool = False,
         attempts_per_session: int = 0,
+        state_output_dir: Path | str | None = None,
     ) -> None:
-        state = EnvState(get_output_dir())
+        self._state_output_dir = Path(state_output_dir or get_output_dir())
+        state = EnvState(self._state_output_dir)
         super().__init__(dashboard_events=dashboard_events, state=state)
         # Evaluation is single-episode; only exploration exposes reset.
         self._explore = explore
         self._solved: bool = False
         self._attempt: int = 1
-        # Bound each planner session while allowing later sessions to continue.
+        # Bound the resettable attempts owned by this planner session.
         self._attempts_per_session: int = max(0, int(attempts_per_session))
         self._session_attempt: int = 1
         self.init_primitives_clean(primitives_kwargs=primitives_kwargs)
@@ -96,10 +99,6 @@ class LiberoToolkit(Toolkit):
                 ),
             }
         return inner(**kwargs)
-
-    def begin_session(self) -> None:
-        """Start a fresh agent session: the per-session attempt budget refills."""
-        self._session_attempt = 0
 
     def _reset_episode(self, reason: str) -> dict[str, Any]:
         """Restart the episode while preserving the full exploration trace."""
@@ -197,4 +196,4 @@ class LiberoToolkit(Toolkit):
 
     def write_recipe(self, recipe_tag: str) -> str:
         """Write the LIBERO recipe JSONL from the dumped state trace."""
-        return libero_tools.write_recipe_from_states(self._state, recipe_tag)
+        return libero_tools.write_recipe_from_states(self._state, recipe_tag, output_dir=get_output_dir())

@@ -132,6 +132,11 @@ LIBERO reported success, and rebuilds ``MEMORY.md``:
      --explore --explore-sessions 3 --explore-attempts-per-session 5 \
      --memory-dir /path/to/local/libero-memory
 
+Each planner session owns a fresh toolkit. Its state trace and observation
+artifacts are retained under ``<output-dir>/sessions/session_NNN/`` for final
+memory distillation, while reset-based attempts within that session reuse the
+same toolkit.
+
 Pass ``--no-auto-merge-memory`` to retain inbox drafts for manual review.
 Maintainers can validate the corpus, rebuild its index, or merge one reviewed
 inbox cell explicitly with ``rpent-memory``:

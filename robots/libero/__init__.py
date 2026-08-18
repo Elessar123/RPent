@@ -48,6 +48,7 @@ def get_toolkit(
     dashboard_events: DashboardEventSink,
     explore: bool = False,
     attempts_per_session: int = 0,
+    state_output_dir: Path | str | None = None,
 ):
     """Return the LIBERO toolkit (common tools + LIBERO primitives)."""
     from robots.libero.toolkit import LiberoToolkit
@@ -57,6 +58,7 @@ def get_toolkit(
         dashboard_events=dashboard_events,
         explore=explore,
         attempts_per_session=attempts_per_session,
+        state_output_dir=state_output_dir,
     )
 
 

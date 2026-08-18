@@ -121,6 +121,10 @@ planner session，并在正常结束后校验、合并 memory，只有 LIBERO �
      --explore --explore-sessions 3 --explore-attempts-per-session 5 \
      --memory-dir /path/to/libero-memory
 
+每个 planner session 使用一个新建的 toolkit，其状态轨迹和观测工件保存在
+``<output-dir>/sessions/session_NNN/``，供最终 memory distillation 使用；同一
+session 内通过 reset 发起的多次 attempt 仍复用该 toolkit。
+
 使用 ``--no-auto-merge-memory`` 可保留 inbox，稍后人工审核。也可直接使用
 memory 维护命令：
 

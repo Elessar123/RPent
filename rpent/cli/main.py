@@ -248,15 +248,6 @@ def main() -> int:
         dashboard_events,
     )
 
-    # --- toolkit -----------------------------------------------------------
-    toolkit = get_toolkit(
-        env_name,
-        primitives_kwargs=primitives_kwargs,
-        dashboard_events=dashboard_events,
-        explore=getattr(args, "explore", False),
-        attempts_per_session=getattr(args, "explore_attempts_per_session", 0),
-    )
-
     # --- agent loop --------------------------------------------------------
     t0 = time.time()
     finish_result, messages, agent_error = None, [], None
@@ -271,6 +262,7 @@ def main() -> int:
     sessions = max(1, int(getattr(args, "explore_sessions", 1) or 1))
     if not getattr(args, "explore", False):
         sessions = 1
+    recipe_path = ""
     try:
         if first_user_msg is not None:
             dashboard_events.emit(RunStartedEvent())
@@ -302,19 +294,36 @@ def main() -> int:
                     },
                 )
                 session_msg = _handoff_message(output_dir, session_no, sessions)
-                toolkit.begin_session()
-            result = planner.solve(
-                system_prompt=system_prompt,
-                user_message=session_msg,
-                toolkit=toolkit,
-                max_turns=args.max_turns,
-                input_queue=input_queue,
+            state_output_dir = output_dir
+            if getattr(args, "explore", False):
+                state_output_dir = output_dir / "sessions" / f"session_{session_no:03d}"
+            toolkit = get_toolkit(
+                env_name,
+                primitives_kwargs=primitives_kwargs,
+                dashboard_events=dashboard_events,
+                explore=getattr(args, "explore", False),
+                attempts_per_session=getattr(args, "explore_attempts_per_session", 0),
+                state_output_dir=state_output_dir,
             )
-            finish_result = result.finish_result
-            messages += result.messages
-            stats = result.stats
-            agent_error = result.error
-            if toolkit.solved():
+            solved = False
+            try:
+                result = planner.solve(
+                    system_prompt=system_prompt,
+                    user_message=session_msg,
+                    toolkit=toolkit,
+                    max_turns=args.max_turns,
+                    input_queue=input_queue,
+                )
+                finish_result = result.finish_result
+                messages += result.messages
+                stats = result.stats
+                agent_error = result.error
+                solved = toolkit.solved()
+                if solved:
+                    recipe_path = toolkit.write_recipe(recipe_tag)
+            finally:
+                toolkit.close()
+            if solved:
                 break
             if agent_error:
                 if (
@@ -333,14 +342,10 @@ def main() -> int:
         agent_error = f"{type(exc).__name__}: {exc}"
         logger.error("EXCEPTION in agent loop: %s", agent_error)
     finally:
-        # Agent-side: flush the episode video before the env+model
-        recipe_path = toolkit.write_recipe(recipe_tag)
         if recipe_path:
             logger.info("recipe: %s", recipe_path)
         else:
             logger.info("recipe: not written (cell unsolved)")
-
-        toolkit.close()
         for d in daemons:
             d.stop()
 

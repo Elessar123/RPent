@@ -12,12 +12,8 @@ from rpent.utils.config import get_memory_dir
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rpent-memory")
-    parser.add_argument(
-        "--memory-dir",
-        type=Path,
-        default=get_memory_dir("libero"),
-        help="Local corpus root (default: resources/libero/memory).",
-    )
+    parser.add_argument("--memory-dir", type=Path, default=get_memory_dir("libero"),
+                        help="Local corpus root (default: resources/libero/memory).")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     merge = subparsers.add_parser("merge", help="Publish one completed cell.")

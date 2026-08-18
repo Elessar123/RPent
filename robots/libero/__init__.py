@@ -83,29 +83,15 @@ def _add_cli_args(parser: argparse.ArgumentParser, use_dashboard: bool) -> None:
                         help="Evaluation memory profile (default: hf).")
     parser.add_argument("--memory-dir", default=None,
                         help="Layered memory root (default: resources/libero/memory).")
-    parser.add_argument(
-        "--auto-merge-memory",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Merge exploration output into layered memory (default: enabled).",
-    )
-    parser.add_argument(
-        "--explore-attempts-per-session",
-        type=int,
-        default=5,
-        help="Attempts per exploration session (default: 5; 0 disables limit).",
-    )
-    parser.add_argument(
-        "--explore-sessions",
-        type=int,
-        default=3,
-        help="Independent planner sessions per exploration run (default: 3).",
-    )
-    parser.add_argument(
-        "--explore",
-        action="store_true",
-        help="Enable multi-attempt exploration and memory distillation.",
-    )
+    parser.add_argument("--auto-merge-memory",
+                        action=argparse.BooleanOptionalAction, default=True,
+                        help="Merge exploration output into layered memory (default: enabled).")
+    parser.add_argument("--explore-attempts-per-session", type=int, default=5,
+                        help="Attempts per exploration session (default: 5; 0 disables limit).")
+    parser.add_argument("--explore-sessions", type=int, default=3,
+                        help="Independent planner sessions per exploration run (default: 3).")
+    parser.add_argument("--explore", action="store_true",
+                        help="Enable multi-attempt exploration and memory distillation.")
     parser.add_argument("--env-endpoint", default=None,
                         help="[protocol://]host:port of an existing env_server "
                              "(protocol=http|socket, defaults to http). "

@@ -1,4 +1,4 @@
-"""Layered-memory variant of the single-attempt LIBERO evaluation prompt."""
+"""Local-memory variant of the single-attempt LIBERO evaluation prompt."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ relevant global leaves through `MEMORY.md`. Recipes are technique references,
 not coordinates: re-localize every entity in the current image. Never read or
 promote `_inbox/`, `_merged/`, or `wip/` during evaluation."""
 
-STEP_READ_LAYERED_MEMORY = """READ THE THREE MEMORY LAYERS FIRST:
+STEP_READ_LOCAL_MEMORY = """READ THE THREE LOCAL MEMORY LAYERS FIRST:
 - task audit: `{{memory_dir}}/task/{{reference_tag}}.json`
 - task recipe: `{{memory_dir}}/task/recipe_{{reference_tag}}.jsonl`
 - suite leaf: find the matching task/regime leaf under `{{memory_dir}}/suite/`
@@ -44,7 +44,7 @@ validated layers. Record the exact files used in final `strategy_notes`. Treat
 absolute coordinates as stale and re-derive them from this scene."""
 
 WORKFLOW_STEPS = (
-    STEP_READ_LAYERED_MEMORY,
+    STEP_READ_LOCAL_MEMORY,
     STEP_READ_GUIDES,
     STEP_INSPECT_INITIAL,
     STEP_PERCEPTION_PASS,

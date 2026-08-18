@@ -56,6 +56,8 @@ def _validate(metadata: dict[str, Any]) -> None:
     if metadata.get("confidence") not in CONFIDENCE:
         raise ValueError(f"confidence must be one of {sorted(CONFIDENCE)}")
     evidence = metadata.get("evidence") or {}
+    if not isinstance(evidence, dict):
+        raise ValueError("evidence must be a mapping")
     if not isinstance(evidence.get("cells"), list) or not evidence["cells"]:
         raise ValueError("evidence.cells must be a non-empty list")
 

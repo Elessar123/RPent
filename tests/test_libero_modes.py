@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from robots.libero.toolkit import LiberoToolkit
-from rpent.cli.main import _build_argparser
+from rpent.cli.main import _build_argparser, _handoff_message
 from rpent.dashboard.events import NullDashboardEventSink
 from rpent.envs.base import get_env_spec
 
@@ -17,6 +17,13 @@ def _parse(*extra: str):
     )
 
 
+def _local_memory(tmp_path):
+    memory_dir = tmp_path / "memory"
+    memory_dir.mkdir()
+    (memory_dir / "MEMORY.md").write_text("# Memory\n")
+    return memory_dir
+
+
 def test_legacy_eval_defaults_to_hf_single_session():
     spec, args = _parse("--planner", "claude_code")
     config = spec.parse_config(args)
@@ -27,9 +34,17 @@ def test_legacy_eval_defaults_to_hf_single_session():
     assert config.prompt_vars["memory_profile"] == "hf"
 
 
-def test_local_eval_uses_same_entrypoint_and_planner():
+def test_local_eval_uses_same_entrypoint_and_planner(tmp_path):
+    memory_dir = _local_memory(tmp_path)
     spec, args = _parse(
-        "--planner", "codex", "--memory-profile", "local", "--seed", "3"
+        "--planner",
+        "codex",
+        "--memory-profile",
+        "local",
+        "--memory-dir",
+        str(memory_dir),
+        "--seed",
+        "3",
     )
     config = spec.parse_config(args)
 
@@ -39,13 +54,19 @@ def test_local_eval_uses_same_entrypoint_and_planner():
     assert config.prompt_vars["reference_tag"] == "10_task_t0_s0"
 
 
-def test_prompt_profiles_are_isolated():
+def test_prompt_profiles_are_isolated(tmp_path):
     spec, hf_args = _parse("--memory-profile", "hf")
     hf_config = spec.parse_config(hf_args)
     hf_vars = {**hf_config.prompt_vars, "output_dir": hf_config.output_dir}
     hf_prompt = spec.prompts.render("system", variables=hf_vars)
 
-    _, local_args = _parse("--memory-profile", "local")
+    memory_dir = _local_memory(tmp_path)
+    _, local_args = _parse(
+        "--memory-profile",
+        "local",
+        "--memory-dir",
+        str(memory_dir),
+    )
     local_config = spec.parse_config(local_args)
     local_prompt = spec.prompts.render(
         "system",
@@ -179,3 +200,10 @@ def test_successful_session_recipe_is_published_at_run_root(tmp_path, monkeypatc
         "recipe_tag": "10_task_t0_s0",
         "output_dir": tmp_path,
     }
+
+
+def test_handoff_uses_fresh_toolkit_episode(tmp_path):
+    message = _handoff_message(tmp_path, 2, 3)
+
+    assert "fresh toolkit has already restored a clean scene" in message
+    assert "Call `reset` first" not in message

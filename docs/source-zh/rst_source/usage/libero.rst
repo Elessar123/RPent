@@ -101,8 +101,10 @@ LIBERO-PRO 核心套件一览
 --------------------------
 
 默认仍为原有单次评测模式。省略 ``--memory-profile`` 时，会继续同步并使用
-Hugging Face memory 和原有 prompt。使用 ``local`` 可基于本地
-global/suite/task 三层 memory 评测：
+Hugging Face memory 和原有 prompt。只有本地已经存在 global/suite/task 三层
+memory 时（例如先执行下文的 exploration 流程），才应使用 ``local``。该选项
+不会开启 exploration，也不会从 Hugging Face 下载 memory；它只会针对
+``--memory-dir`` 执行普通的单次评测，并避免同步覆盖本地目录：
 
 .. code-block:: bash
 
@@ -112,7 +114,8 @@ global/suite/task 三层 memory 评测：
 
 探索模式沿用同一个 Python/CLI 入口。它支持可 reset 的多次尝试和独立
 planner session，并在正常结束后校验、合并 memory，只有 LIBERO 确认成功时
-才发布 task audit/recipe：
+才发布 task audit/recipe。探索可以从空的 ``--memory-dir`` 开始，并始终使用
+local profile；真正开启该流程的是 ``--explore``：
 
 .. code-block:: bash
 
@@ -124,6 +127,9 @@ planner session，并在正常结束后校验、合并 memory，只有 LIBERO �
 每个 planner session 使用一个新建的 toolkit，其状态轨迹和观测工件保存在
 ``<output-dir>/sessions/session_NNN/``，供最终 memory distillation 使用；同一
 session 内通过 reset 发起的多次 attempt 仍复用该 toolkit。
+
+在 exploration 命令中增加 ``--dashboard``，即可跨 planner session 查看完整
+推理过程、相机画面和连续动作时间线。
 
 使用 ``--no-auto-merge-memory`` 可保留 inbox，稍后人工审核。也可直接使用
 memory 维护命令：

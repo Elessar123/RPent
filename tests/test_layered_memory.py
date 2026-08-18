@@ -74,6 +74,36 @@ def test_merge_cell_never_publishes_unsolved_task_recipe(tmp_path: Path):
     assert not (memory_dir / "task" / f"recipe_{cell}.jsonl").exists()
 
 
+def test_merge_cell_skips_draft_with_non_mapping_evidence(tmp_path: Path):
+    memory_dir = tmp_path / "memory"
+    output_dir = tmp_path / "run"
+    output_dir.mkdir()
+    cell = "10_task_t0_s0"
+    inbox = memory_dir / "_inbox" / cell
+    inbox.mkdir(parents=True)
+    (inbox / "new_global_strategy.md").write_text(
+        """---
+scope: global
+kind: strategy
+title: Test strategy
+applies_when: Testing malformed evidence
+evidence: [10_task_t0_s0]
+confidence: single-shot
+---
+Test body.
+"""
+    )
+
+    result = merge_cell(
+        memory_dir=memory_dir, cell_tag=cell, output_dir=output_dir
+    )
+
+    assert result["global"] == 0
+    assert result["skipped"] == [
+        "new_global_strategy.md: evidence must be a mapping"
+    ]
+
+
 def test_merge_cell_is_idempotent_for_same_cell(tmp_path: Path):
     memory_dir = tmp_path / "memory"
     output_dir = tmp_path / "run"

@@ -127,6 +127,12 @@ def _parse_config(args: argparse.Namespace) -> RunConfig:
         if args.memory_dir
         else get_memory_dir("libero")
     )
+    local_eval = not explore and args.memory_profile == "local"
+    if local_eval and not (memory_dir / "MEMORY.md").is_file():
+        raise ValueError(
+            f"local memory corpus not found at {memory_dir}; "
+            "run exploration first or use --memory-profile hf"
+        )
     prompt_vars = {
         "suite": args.suite,
         "task": args.task,

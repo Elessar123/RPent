@@ -157,7 +157,8 @@ def _handoff_message(output_dir, session_no: int, session_max: int) -> str:
         f"{attempts_dir}/ ({', '.join(prior) if prior else 'none yet'}), and their "
         "working notes are in the memory inbox under wip/.\n\n"
         "Read every archive and the working notes before acting. Do not repeat "
-        "failed approaches. Call `reset` first to restore a clean scene."
+        "failed approaches. A fresh toolkit has already restored a clean scene; "
+        "inspect it before acting."
     )
 
 
@@ -172,8 +173,6 @@ def main() -> int:
     args = parser.parse_args()
     if args.dashboard and args.interactive:
         parser.error("--dashboard and --interactive cannot be used together")
-    if args.dashboard and getattr(args, "explore", False):
-        parser.error("--dashboard and --explore cannot be used together")
     if args.dashboard:
         from rpent.cli.dashboard import run_dashboard_session
 
@@ -369,8 +368,6 @@ def main() -> int:
                  stats.get('total_output_tokens', '?'),
                  stats.get('tool_calls', '?'))
     logger.info("transcript: %s", transcript_path)
-    if agent_error:
-        logger.error("error: %s", agent_error)
 
     # Publish environment-specific artifacts after recipe export and shutdown.
     if env_spec.finalize_run is not None and not agent_error:

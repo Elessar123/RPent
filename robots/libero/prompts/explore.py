@@ -51,7 +51,7 @@ must localize objects yourself from the camera image + depth + calibration.
 > impossible" has been written confidently about cells that other runs had
 > already solved; it is never the right conclusion, only the tempting one.
 >
-> **YOU ARE AGENT {{session_no}} OF UP TO {{session_max}} ON THIS CELL.** If you
+> **YOU ARE AGENT {{session_number}} OF UP TO {{session_max}} ON THIS CELL.** If you
 > exhaust your own ideas, you do not declare the cell unsolvable — you hand off:
 > close out your attempts, write your notes, and finish. A fresh agent picks up
 > your archives and continues without inheriting your dead ends. Handing off

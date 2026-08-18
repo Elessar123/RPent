@@ -13,9 +13,9 @@ from rpent.context.prompt_utils import Numbered, PromptNode
 
 def system_prompt(variables: Mapping[str, object] | None = None) -> PromptNode:
     """Assemble the LIBERO system prompt for the selected run mode."""
-    if str((variables or {}).get("mode", "eval")) == "explore":
+    if (variables or {}).get("mode", "eval") == "explore":
         return explore_parts.system_prompt()
-    if str((variables or {}).get("memory_profile", "hf")) == "local":
+    if (variables or {}).get("memory_profile", "hf") == "local":
         return local_eval_parts.system_prompt()
     return {
         "ROLE AND EVALUATION": system_parts.ROLE_AND_EVALUATION,

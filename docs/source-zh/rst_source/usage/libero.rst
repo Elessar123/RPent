@@ -100,11 +100,22 @@ LIBERO-PRO 核心套件一览
 探索模式与本地 Memory 评测
 --------------------------
 
+RPent 支持两种 LIBERO 运行模式：
+
+- **Exploration** 使用可 reset 的多次 attempt 和相互独立的 planner session
+  探索成功策略，并将其提炼为本地 global/suite/task 三层 memory corpus。它是
+  memory 生成流程，不用于统计 benchmark success rate。
+- **Evaluation** 是默认的单次评测模式，不会 reset episode，也不会更新
+  memory。使用本地 memory 的 evaluation 会读取 exploration 生成并通过校验的
+  audit、recipe 和经验。HarnessVLA 的 success rate 在 evaluation mode 下复现。
+
 默认仍为原有单次评测模式。省略 ``--memory-profile`` 时，会继续同步并使用
-Hugging Face memory 和原有 prompt。只有本地已经存在 global/suite/task 三层
-memory 时（例如先执行下文的 exploration 流程），才应使用 ``local``。该选项
-不会开启 exploration，也不会从 Hugging Face 下载 memory；它只会针对
-``--memory-dir`` 执行普通的单次评测，并避免同步覆盖本地目录：
+Hugging Face memory 和原有 prompt。两种 profile 都执行相同的单次评测流程；
+区别仅在于评测 memory 的来源及所使用的 memory prompt。只有本地已经存在
+global/suite/task 三层 memory 时（例如先执行下文的 exploration 流程），才应
+使用 ``local``。该选项不会开启 exploration，也不会从 Hugging Face 下载
+memory；它只会针对 ``--memory-dir`` 执行普通的单次评测，并避免同步覆盖本地
+目录：
 
 .. code-block:: bash
 

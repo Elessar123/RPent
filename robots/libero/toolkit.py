@@ -29,15 +29,16 @@ class LiberoToolkit(Toolkit):
         *,
         primitives_kwargs: dict[str, Any],
         dashboard_events: DashboardEventSink,
-        explore: bool = False,
+        mode: str = "evaluation",
         attempts_per_session: int = 0,
         state_output_dir: Path | str | None = None,
     ) -> None:
         self._state_output_dir = Path(state_output_dir or get_output_dir())
         state = EnvState(self._state_output_dir)
         super().__init__(dashboard_events=dashboard_events, state=state)
-        # Evaluation is single-episode; only exploration exposes reset.
-        self._explore = explore
+        if mode not in {"evaluation", "exploration"}:
+            raise ValueError(f"unsupported LIBERO toolkit mode: {mode!r}")
+        self._mode = mode
         self._solved: bool = False
         self._attempt: int = 1
         # Bound the resettable attempts owned by this planner session.
@@ -65,7 +66,7 @@ class LiberoToolkit(Toolkit):
         }
         for spec in libero_tools.TOOLS_SPEC:
             name = spec["name"]
-            if name == "reset" and not self._explore:
+            if name == "reset" and self._mode != "exploration":
                 continue
             if name in state_handlers:
                 handler = state_handlers[name]
@@ -74,7 +75,7 @@ class LiberoToolkit(Toolkit):
                 if handler is None:
                     continue  # spec without a backing primitive method
             self.add_tool(name, spec, handler)
-        if self._explore:
+        if self._mode == "exploration":
             reset_spec = next(
                 spec for spec in libero_tools.TOOLS_SPEC if spec["name"] == "reset"
             )

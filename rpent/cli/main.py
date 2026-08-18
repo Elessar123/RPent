@@ -125,6 +125,12 @@ def _build_argparser() -> argparse.ArgumentParser:
 
     # other config
     ap.add_argument("--output-dir", default=None)
+    ap.add_argument("--memory-profile", choices=["hf", "local"], default=None,
+                    help="Memory profile (default: hf for evaluation, local for exploration).")
+    ap.add_argument("--memory-dir", default=None,
+                    help="Local memory root (environment default when omitted).")
+    ap.add_argument("--explore", action="store_true",
+                    help="Enable exploration and memory distillation.")
     ap.add_argument("--dashboard", action="store_true",
                     help="Start a local dashboard server for this single run.")
     ap.add_argument("--dashboard-host", default="127.0.0.1",
@@ -143,7 +149,7 @@ def _build_argparser() -> argparse.ArgumentParser:
     return ap
 
 
-def _handoff_message(output_dir, session_no: int, session_max: int) -> str:
+def _handoff_message(output_dir, session_number: int, session_max: int) -> str:
     """Build the opening message for a continuation session."""
     attempts_dir = Path(output_dir) / "attempts"
     prior = (
@@ -152,7 +158,7 @@ def _handoff_message(output_dir, session_no: int, session_max: int) -> str:
         else []
     )
     return (
-        f"You are agent {session_no} of up to {session_max} on this cell. "
+        f"You are agent {session_number} of up to {session_max} on this cell. "
         f"{len(prior)} attempt(s) by earlier agents are archived in "
         f"{attempts_dir}/ ({', '.join(prior) if prior else 'none yet'}), and their "
         "working notes are in the memory inbox under wip/.\n\n"
@@ -173,6 +179,13 @@ def main() -> int:
     args = parser.parse_args()
     if args.dashboard and args.interactive:
         parser.error("--dashboard and --interactive cannot be used together")
+    if args.explore and args.memory_profile == "hf":
+        parser.error("--explore cannot be used with --memory-profile hf")
+    if args.explore and getattr(args, "explore_sessions", 1) <= 0:
+        parser.error("--explore-sessions must be greater than 0")
+    args.memory_profile = args.memory_profile or ("local" if args.explore else "hf")
+    if args.memory_profile == "hf" and args.memory_dir is not None:
+        parser.error("--memory-dir requires --memory-profile local or --explore")
     if args.dashboard:
         from rpent.cli.dashboard import run_dashboard_session
 
@@ -266,11 +279,11 @@ def main() -> int:
         if first_user_msg is not None:
             dashboard_events.emit(RunStartedEvent())
         session_msg = first_user_msg
-        for session_no in range(1, sessions + 1):
+        for session_number in range(1, sessions + 1):
             if session_msg is None:
                 break
-            if session_no > 1:
-                logger.info("=== handing off to agent %d/%d ===", session_no, sessions)
+            if session_number > 1:
+                logger.info("=== handing off to agent %d/%d ===", session_number, sessions)
                 planner = build_planner(
                     args.planner,
                     output_dir=output_dir,
@@ -288,19 +301,19 @@ def main() -> int:
                     "system",
                     variables={
                         **prompt_vars,
-                        "session_no": session_no,
+                        "session_number": session_number,
                         "session_max": sessions,
                     },
                 )
-                session_msg = _handoff_message(output_dir, session_no, sessions)
+                session_msg = _handoff_message(output_dir, session_number, sessions)
             state_output_dir = output_dir
             if getattr(args, "explore", False):
-                state_output_dir = output_dir / "sessions" / f"session_{session_no:03d}"
+                state_output_dir = output_dir / "sessions" / f"session_{session_number:03d}"
             toolkit = get_toolkit(
                 env_name,
                 primitives_kwargs=primitives_kwargs,
                 dashboard_events=dashboard_events,
-                explore=getattr(args, "explore", False),
+                mode=("exploration" if args.explore else "evaluation"),
                 attempts_per_session=getattr(args, "explore_attempts_per_session", 0),
                 state_output_dir=state_output_dir,
             )
@@ -327,12 +340,12 @@ def main() -> int:
             if agent_error:
                 if (
                     getattr(args, "explore", False)
-                    and session_no < sessions
+                    and session_number < sessions
                     and "timed out" in agent_error.lower()
                 ):
                     logger.warning(
                         "session %d/%d timed out; continuing with a fresh handoff",
-                        session_no,
+                        session_number,
                         sessions,
                     )
                     continue

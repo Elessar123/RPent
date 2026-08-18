@@ -103,8 +103,22 @@ To switch planners, see :doc:`configure_planner`.
 Exploration and local-memory evaluation
 ---------------------------------------
 
+RPent supports two LIBERO run modes:
+
+- **Exploration** uses multiple resettable attempts and independent planner
+  sessions to discover successful strategies and distil them into a local
+  global/suite/task memory corpus. It is a memory-generation workflow, not the
+  benchmark success-rate measurement.
+- **Evaluation** is the default, single-attempt mode. It does not reset the
+  episode or update memory. Local-memory evaluation consumes the validated
+  audit, recipe, and lessons produced by exploration. The HarnessVLA success
+  rate is reproduced in evaluation mode.
+
 Evaluation remains the default mode.  Omitting ``--memory-profile`` preserves
 the original Hugging Face resource sync and prompt:
+
+Both profiles run the same single-attempt evaluation workflow; they differ only
+in where the evaluation memory comes from and which memory prompt is used.
 
 .. code-block:: bash
 

@@ -171,7 +171,7 @@ def test_libero_toolkit_uses_custom_state_output_dir(tmp_path, monkeypatch):
     toolkit = LiberoToolkit(
         primitives_kwargs={},
         dashboard_events=NullDashboardEventSink(),
-        explore=True,
+        mode="exploration",
         attempts_per_session=5,
         state_output_dir=state_dir,
     )

@@ -166,25 +166,25 @@ def _run_dashboard_task(
                 sessions = 1
             if not state.task_replacement_requested:
                 state.emit(RunStartedEvent())
-            for session_no in range(1, sessions + 1):
+            for session_number in range(1, sessions + 1):
                 if state.task_replacement_requested:
                     break
-                if session_no > 1:
+                if session_number > 1:
                     logger.info(
                         "=== handing off to agent %d/%d ===",
-                        session_no,
+                        session_number,
                         sessions,
                     )
                     session_message = _handoff_message(
                         output_dir,
-                        session_no,
+                        session_number,
                         sessions,
                     )
                 system_prompt = env_spec.prompts.render(
                     "system",
                     variables={
                         **prompt_vars,
-                        "session_no": session_no,
+                        "session_number": session_number,
                         "session_max": sessions,
                     },
                 )
@@ -193,7 +193,7 @@ def _run_dashboard_task(
                     state_output_dir = (
                         output_dir
                         / "sessions"
-                        / f"session_{session_no:03d}"
+                        / f"session_{session_number:03d}"
                     )
                     state.begin_planner_session(
                         video_path=state_output_dir / "episode.mp4",
@@ -202,7 +202,7 @@ def _run_dashboard_task(
                     args.env_name,
                     primitives_kwargs=primitives_kwargs,
                     dashboard_events=state,
-                    explore=getattr(task_args, "explore", False),
+                    mode=("exploration" if task_args.explore else "evaluation"),
                     attempts_per_session=getattr(
                         task_args,
                         "explore_attempts_per_session",
@@ -245,12 +245,12 @@ def _run_dashboard_task(
                     break
                 if agent_error:
                     if (
-                        session_no < sessions
+                        session_number < sessions
                         and "timed out" in agent_error.lower()
                     ):
                         logger.warning(
                             "session %d/%d timed out; continuing with a fresh handoff",
-                            session_no,
+                            session_number,
                             sessions,
                         )
                         continue

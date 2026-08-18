@@ -46,7 +46,7 @@ def get_toolkit(
     *,
     primitives_kwargs: dict[str, Any],
     dashboard_events: DashboardEventSink,
-    explore: bool = False,
+    mode: str = "evaluation",
     attempts_per_session: int = 0,
     state_output_dir: Path | str | None = None,
 ):
@@ -56,7 +56,7 @@ def get_toolkit(
     return LiberoToolkit(
         primitives_kwargs=primitives_kwargs,
         dashboard_events=dashboard_events,
-        explore=explore,
+        mode=mode,
         attempts_per_session=attempts_per_session,
         state_output_dir=state_output_dir,
     )
@@ -79,10 +79,6 @@ def _add_cli_args(parser: argparse.ArgumentParser, use_dashboard: bool) -> None:
                         help="e.g. libero_object_task, libero_spatial_swap")
     parser.add_argument("--task", type=int, default=None, required=required)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--memory-profile", choices=["hf", "local"], default="hf",
-                        help="Evaluation memory profile (default: hf).")
-    parser.add_argument("--memory-dir", default=None,
-                        help="Layered memory root (default: resources/libero/memory).")
     parser.add_argument("--auto-merge-memory",
                         action=argparse.BooleanOptionalAction, default=True,
                         help="Merge exploration output into layered memory (default: enabled).")
@@ -90,8 +86,6 @@ def _add_cli_args(parser: argparse.ArgumentParser, use_dashboard: bool) -> None:
                         help="Attempts per exploration session (default: 5; 0 disables limit).")
     parser.add_argument("--explore-sessions", type=int, default=3,
                         help="Independent planner sessions per exploration run (default: 3).")
-    parser.add_argument("--explore", action="store_true",
-                        help="Enable multi-attempt exploration and memory distillation.")
     parser.add_argument("--env-endpoint", default=None,
                         help="[protocol://]host:port of an existing env_server "
                              "(protocol=http|socket, defaults to http). "
@@ -122,12 +116,21 @@ def _parse_config(args: argparse.Namespace) -> RunConfig:
 
     recipe_tag = f"{args.suite.replace('libero_', '')}_t{args.task}_s{args.seed}"
     explore = bool(getattr(args, "explore", False))
+    requested_profile = getattr(args, "memory_profile", None)
+    if explore and requested_profile == "hf":
+        raise ValueError("--explore cannot be used with --memory-profile hf")
+    if explore and args.explore_sessions <= 0:
+        raise ValueError("--explore-sessions must be greater than 0")
+    memory_profile = requested_profile or ("local" if explore else "hf")
+    if memory_profile == "hf" and args.memory_dir is not None:
+        raise ValueError("--memory-dir requires --memory-profile local or --explore")
+    args.memory_profile = memory_profile
     memory_dir = (
         Path(args.memory_dir).expanduser().resolve()
         if args.memory_dir
         else get_memory_dir("libero")
     )
-    local_eval = not explore and args.memory_profile == "local"
+    local_eval = not explore and memory_profile == "local"
     if local_eval and not (memory_dir / "MEMORY.md").is_file():
         raise ValueError(
             f"local memory corpus not found at {memory_dir}; "
@@ -139,12 +142,12 @@ def _parse_config(args: argparse.Namespace) -> RunConfig:
         "seed": args.seed,
         "recipe_tag": recipe_tag,
         "mode": "explore" if explore else "eval",
-        "memory_profile": "local" if explore else args.memory_profile,
+        "memory_profile": memory_profile,
         "memory_dir": str(memory_dir),
         "reference_tag": f"{args.suite.replace('libero_', '')}_t{args.task}_s0",
         # Per-cell inbox: parallel explore runs must not append to a shared file.
         "memory_inbox": str(memory_dir / "_inbox" / recipe_tag),
-        "session_no": 1,
+        "session_number": 1,
         "session_max": max(1, args.explore_sessions) if explore else 1,
     }
 

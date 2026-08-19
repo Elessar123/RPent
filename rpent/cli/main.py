@@ -168,6 +168,37 @@ def _handoff_message(output_dir, session_number: int, session_max: int) -> str:
     )
 
 
+def _start_continuation_session(args, *, output_dir, recipe_tag,
+                                dashboard_events, prompt_bundle, prompt_vars,
+                                session_number: int, session_max: int):
+    """Build a fresh planner and prompts for an exploration handoff."""
+    logger.info("=== handing off to agent %d/%d ===",
+                session_number, session_max)
+    planner = build_planner(
+        args.planner,
+        output_dir=output_dir,
+        recipe_tag=recipe_tag,
+        env_name=args.env_name,
+        base_url=args.base_url,
+        model=args.model,
+        max_tokens=args.max_tokens,
+        planner_timeout_s=args.planner_timeout_s,
+        claude_code_max_budget_usd=args.claude_code_max_budget_usd,
+        dashboard_events=dashboard_events,
+        no_images=args.no_images,
+    )
+    system_prompt = prompt_bundle.render(
+        "system",
+        variables={
+            **prompt_vars,
+            "session_number": session_number,
+            "session_max": session_max,
+        },
+    )
+    session_message = _handoff_message(output_dir, session_number, session_max)
+    return planner, system_prompt, session_message
+
+
 def main() -> int:
     parser = _build_argparser()
     # Two-phase argparse: first grab --env / --dashboard so we know which
@@ -283,29 +314,11 @@ def main() -> int:
             if session_msg is None:
                 break
             if session_number > 1:
-                logger.info("=== handing off to agent %d/%d ===", session_number, sessions)
-                planner = build_planner(
-                    args.planner,
-                    output_dir=output_dir,
-                    recipe_tag=recipe_tag,
-                    env_name=env_name,
-                    base_url=args.base_url,
-                    model=args.model,
-                    max_tokens=args.max_tokens,
-                    planner_timeout_s=args.planner_timeout_s,
-                    claude_code_max_budget_usd=args.claude_code_max_budget_usd,
-                    dashboard_events=dashboard_events,
-                    no_images=args.no_images,
-                )
-                system_prompt = prompt_bundle.render(
-                    "system",
-                    variables={
-                        **prompt_vars,
-                        "session_number": session_number,
-                        "session_max": sessions,
-                    },
-                )
-                session_msg = _handoff_message(output_dir, session_number, sessions)
+                planner, system_prompt, session_msg = _start_continuation_session(
+                    args, output_dir=output_dir, recipe_tag=recipe_tag,
+                    dashboard_events=dashboard_events, prompt_bundle=prompt_bundle,
+                    prompt_vars=prompt_vars, session_number=session_number,
+                    session_max=sessions)
             state_output_dir = output_dir
             if getattr(args, "explore", False):
                 state_output_dir = output_dir / "sessions" / f"session_{session_number:03d}"

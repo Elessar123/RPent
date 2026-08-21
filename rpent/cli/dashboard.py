@@ -198,18 +198,27 @@ def _run_dashboard_task(
                     state.begin_planner_session(
                         video_path=state_output_dir / "episode.mp4",
                     )
-                toolkit = get_toolkit(
-                    args.env_name,
-                    primitives_kwargs=primitives_kwargs,
-                    dashboard_events=state,
-                    mode=("exploration" if task_args.explore else "evaluation"),
-                    attempts_per_session=getattr(
-                        task_args,
-                        "explore_attempts_per_session",
-                        0,
-                    ),
-                    state_output_dir=state_output_dir,
-                )
+                if args.env_name == "libero":
+                    toolkit = get_toolkit(
+                        args.env_name,
+                        primitives_kwargs=primitives_kwargs,
+                        dashboard_events=state,
+                        mode=(
+                            "exploration" if task_args.explore else "evaluation"
+                        ),
+                        attempts_per_session=getattr(
+                            task_args,
+                            "explore_attempts_per_session",
+                            0,
+                        ),
+                        state_output_dir=state_output_dir,
+                    )
+                else:
+                    toolkit = get_toolkit(
+                        args.env_name,
+                        primitives_kwargs=primitives_kwargs,
+                        dashboard_events=state,
+                    )
                 solved = False
                 try:
                     planner = build_planner(

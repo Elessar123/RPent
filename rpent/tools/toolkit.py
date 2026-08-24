@@ -315,7 +315,7 @@ class Toolkit:
         ``status="success"`` on a cell it did not actually finish, so the
         handoff decision reads the environment, not the agent.
         """
-        return False
+        raise NotImplementedError
 
     def write_recipe(self, recipe_tag: str) -> str | None:
         """Write a replay recipe for this env, if supported."""

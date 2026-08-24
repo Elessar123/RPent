@@ -62,6 +62,7 @@ class ClaudeCodePlanner:
         max_budget_usd: float = 10.0,
         extra_dirs: list[str] | None = None,
         output_path: str | Path | None = None,
+        reasoning: str = "enabled",
     ):
         """Initialize the Claude Agent SDK backend."""
         self._output_dir = str(output_dir)
@@ -73,6 +74,9 @@ class ClaudeCodePlanner:
         self._extra_dirs = extra_dirs or []
         self._output_path = Path(output_path) if output_path else None
         self._dashboard_events = dashboard_events
+        if reasoning not in {"enabled", "disabled"}:
+            raise ValueError(f"unsupported reasoning mode: {reasoning}")
+        self._reasoning = reasoning
 
     def solve(
         self,
@@ -338,6 +342,7 @@ class ClaudeCodePlanner:
             add_dirs=[self._output_dir, *self._extra_dirs],
             # Ignore user/project .claude configuration; RPent owns the loop.
             setting_sources=[],
+            thinking={"type": "disabled"} if self._reasoning == "disabled" else None,
             stderr=lambda line: logger.debug("[claude-sdk] %s", line.rstrip()),
         )
 

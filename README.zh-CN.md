@@ -181,6 +181,7 @@ RoboCasa 使用独立入口与安装指南。安装与运行流程见 [RoboCasa 
     <tr><td><code>--model</code></td><td>—</td><td>模型 ID；<code>api</code> 需带 provider 前缀（<code>anthropic:…</code>、<code>openai:…</code>、<code>openai-chat:…</code>）</td></tr>
     <tr><td><code>--max-turns</code></td><td><code>100</code></td><td>智能体最大轮数</td></tr>
     <tr><td><code>--max-tokens</code></td><td><code>8192</code></td><td>单次 LLM 回复最大 token</td></tr>
+    <tr><td><code>--reasoning</code></td><td><code>enabled</code></td><td>启用或关闭 <code>claude_code</code> 与 <code>codex</code> 的推理。在评测时设为 <code>disabled</code> 可以显著缩短运行时间，同时通常只会对效果产生轻微影响。</td></tr>
     <tr><td><code>--no-images</code></td><td>关</td><td>纯文本模式：不向模型发送图片字节（用于不支持图片输入的模型）</td></tr>
     <tr><td><code>--max-episode-steps</code></td><td><code>10000</code></td><td>环境最大步数</td></tr>
     <tr><td><code>--libero-type</code></td><td><code>LIBERO_TYPE</code> 或 <code>pro</code></td><td>LIBERO 类型：<code>standard</code> | <code>pro</code> | <code>plus</code></td></tr>

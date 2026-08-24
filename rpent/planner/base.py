@@ -109,6 +109,7 @@ def build_planner(
     model: str | None = None,
     max_tokens: int = 8192,
     planner_timeout_s: int | None = None,
+    reasoning: str = "enabled",
     claude_code_max_budget_usd: float | None = None,
     dashboard_events: DashboardEventSink,
     no_images: bool = False,
@@ -178,6 +179,7 @@ def build_planner(
             extra_dirs=[str(get_memory_dir(env_name))],
             output_path=Path(output_dir) / f"claude_{recipe_tag}.txt",
             dashboard_events=dashboard_events,
+            reasoning=reasoning,
         )
     if planner_type == "codex":
         from rpent.planner.codex import CodexPlanner
@@ -198,5 +200,6 @@ def build_planner(
             extra_dirs=[str(get_memory_dir(env_name))],
             output_path=Path(output_dir) / f"codex_{recipe_tag}.txt",
             dashboard_events=dashboard_events,
+            reasoning=reasoning,
         )
     raise ValueError(f"unknown planner_type: {planner_type}")

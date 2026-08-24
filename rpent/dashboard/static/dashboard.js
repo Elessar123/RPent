@@ -1304,6 +1304,7 @@ function showLauncher(defaults) {
   set("#f-max-turns", d["max-turns"]);
   set("#f-max-episode-steps", d["max-episode-steps"]);
   set("#f-planner-timeout-s", d["planner-timeout-s"]);
+  set("#f-reasoning", d.reasoning || "enabled");
   set("#f-claude-code-max-budget-usd", d["claude-code-max-budget-usd"]);
   set("#f-cuda-device", d["cuda-device"]);
   $("#f-no-images").checked = Boolean(d["no-images"]);
@@ -1338,6 +1339,7 @@ function collectLaunchConfig() {
     "max-episode-steps": numOrNull("#f-max-episode-steps"),
     model: selectedModel(),
     "planner-timeout-s": numOrNull("#f-planner-timeout-s"),
+    reasoning: $("#f-reasoning").value,
     "no-images": $("#f-no-images").checked,
     "cuda-device": $("#f-cuda-device").value.trim(),
   };

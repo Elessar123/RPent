@@ -210,6 +210,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.dashboard and args.interactive:
         parser.error("--dashboard and --interactive cannot be used together")
+    if args.explore and args.env_name != "libero":
+        parser.error("--explore is currently supported only for LIBERO")
     if args.explore and args.memory_profile == "hf":
         parser.error("--explore cannot be used with --memory-profile hf")
     if args.explore and getattr(args, "explore_sessions", 1) <= 0:
@@ -322,14 +324,25 @@ def main() -> int:
             state_output_dir = output_dir
             if getattr(args, "explore", False):
                 state_output_dir = output_dir / "sessions" / f"session_{session_number:03d}"
-            toolkit = get_toolkit(
-                env_name,
-                primitives_kwargs=primitives_kwargs,
-                dashboard_events=dashboard_events,
-                mode=("exploration" if args.explore else "evaluation"),
-                attempts_per_session=getattr(args, "explore_attempts_per_session", 0),
-                state_output_dir=state_output_dir,
-            )
+            if env_name == "libero":
+                toolkit = get_toolkit(
+                    env_name,
+                    primitives_kwargs=primitives_kwargs,
+                    dashboard_events=dashboard_events,
+                    mode=("exploration" if args.explore else "evaluation"),
+                    attempts_per_session=getattr(
+                        args,
+                        "explore_attempts_per_session",
+                        0,
+                    ),
+                    state_output_dir=state_output_dir,
+                )
+            else:
+                toolkit = get_toolkit(
+                    env_name,
+                    primitives_kwargs=primitives_kwargs,
+                    dashboard_events=dashboard_events,
+                )
             solved = False
             try:
                 result = planner.solve(
@@ -343,9 +356,10 @@ def main() -> int:
                 messages += result.messages
                 stats = result.stats
                 agent_error = result.error
-                solved = toolkit.solved()
-                if solved:
-                    recipe_path = toolkit.write_recipe(recipe_tag)
+                if env_name == "libero":
+                    solved = toolkit.solved()
+                    if solved:
+                        recipe_path = toolkit.write_recipe(recipe_tag)
             finally:
                 toolkit.close()
             if solved:

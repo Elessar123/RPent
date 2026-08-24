@@ -245,9 +245,10 @@ def _run_dashboard_task(
                     messages += result.messages
                     stats = result.stats
                     agent_error = result.error
-                    solved = toolkit.solved()
-                    if solved:
-                        recipe_path = toolkit.write_recipe(recipe_tag)
+                    if args.env_name == "libero":
+                        solved = toolkit.solved()
+                        if solved:
+                            recipe_path = toolkit.write_recipe(recipe_tag)
                 finally:
                     toolkit.close()
                 if solved or state.task_replacement_requested:

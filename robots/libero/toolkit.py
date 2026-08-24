@@ -15,6 +15,8 @@ from rpent.tools.state import EnvState
 from rpent.tools.toolkit import Toolkit, readonly
 from rpent.utils.logging import get_logger, get_output_dir
 
+logger = get_logger("libero_toolkit")
+
 
 class LiberoToolkit(Toolkit):
     """Toolkit for the LIBERO environment."""
@@ -150,7 +152,7 @@ class LiberoToolkit(Toolkit):
                         fps=20,
                     )
             except Exception as e:
-                get_logger("libero_toolkit").warning(
+                logger.warning(
                     "failed to save action clip for step %s: %s",
                     record.step_idx,
                     e,
@@ -187,7 +189,9 @@ class LiberoToolkit(Toolkit):
             if frames:
                 self._state.save("episode.mp4", frames, step=None, fps=20)
         except Exception as e:
-            get_logger("libero_toolkit").warning(
+            # The runner is in the cleanup path; never let a video save
+            # abort it.
+            logger.warning(
                 f"failed to save episode video: {e}"
             )
 

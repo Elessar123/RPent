@@ -109,15 +109,10 @@ def _build_argparser() -> argparse.ArgumentParser:
                     help="API base URL. Defaults to the selected backend's base URL env var.")
     ap.add_argument("--max-turns", type=int, default=100)
     ap.add_argument("--max-tokens", type=int, default=8192)
-    ap.add_argument(
-        "--reasoning",
-        choices=["enabled", "disabled"],
-        default="enabled",
-        help=(
-            "Enable or disable planner reasoning for claude_code and codex. "
-            "Defaults to enabled."
-        ),
-    )
+    ap.add_argument("--reasoning", choices=["enabled", "disabled"],
+                    default="enabled",
+                    help="Enable or disable planner reasoning for claude_code "
+                         "and codex. Defaults to enabled.")
     ap.add_argument("--no-images", action="store_true",
                     help="Never send image bytes to the model (api planner only). "
                          "Use for text-only models that reject image input "

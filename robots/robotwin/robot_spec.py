@@ -123,7 +123,7 @@ def env_runtime_contract(
             "step": True,
             "chunk_step": True,
             "action_layouts": ["qpos14", MODEL_SPEC.action_layout],
-            "chunk_step_all_frames": False,
+            "chunk_step_all_frames": True,
             "step_limit": int(max_episode_steps),
         },
         "extensions": {
@@ -513,7 +513,7 @@ def _init_shared_runtime_impl(
     from rpent.utils.daemon import ProcessDaemon, pick_free_port
 
     _, vla_cuda_device = _resolve_cuda_devices(args)
-    model_path = args._robotwin_runtime_paths.model_path
+    model_path = _resolve_vla_runtime_path(args)
     if args.vla_endpoint is None:
         assert model_path is not None
         robot_config = _resolve_lingbot_robot_config(args, model_path)

@@ -62,7 +62,7 @@ class ClaudeCodePlanner:
         max_budget_usd: float = 10.0,
         extra_dirs: list[str] | None = None,
         output_path: str | Path | None = None,
-        reasoning: str = "enabled",
+        reasoning: str = "disabled",
     ):
         """Initialize the Claude Agent SDK backend."""
         self._output_dir = str(output_dir)

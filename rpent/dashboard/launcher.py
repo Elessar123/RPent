@@ -29,7 +29,7 @@ def apply_to_args(args: Any, payload: dict[str, Any]) -> None:
     args.max_episode_steps = int(payload["max-episode-steps"])
     timeout = payload.get("planner-timeout-s")
     args.planner_timeout_s = None if timeout in ("", None) else int(timeout)
-    args.reasoning = payload.get("reasoning", "enabled")
+    args.reasoning = payload.get("reasoning", "disabled")
     args.no_images = bool(payload.get("no-images", False))
     if args.planner == "claude_code":
         budget = payload.get("claude-code-max-budget-usd")

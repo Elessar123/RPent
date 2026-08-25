@@ -63,7 +63,7 @@ class CodexPlanner:
         extra_dirs: list[str] | None = None,
         output_path: str | Path | None = None,
         model: str | None = None,
-        reasoning: str = "enabled",
+        reasoning: str = "disabled",
     ):
         """Initialize the Codex SDK backend."""
         self._output_dir = str(output_dir)

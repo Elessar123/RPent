@@ -109,7 +109,7 @@ def build_planner(
     model: str | None = None,
     max_tokens: int = 8192,
     planner_timeout_s: int | None = None,
-    reasoning: str = "enabled",
+    reasoning: str = "disabled",
     claude_code_max_budget_usd: float | None = None,
     dashboard_events: DashboardEventSink,
     no_images: bool = False,

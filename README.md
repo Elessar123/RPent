@@ -180,7 +180,7 @@ RoboCasa uses a separate entrypoint and install guide. See the [RoboCasa usage d
     <tr><td><code>--model</code></td><td>—</td><td>Model id; for <code>api</code>, prefix the provider (<code>anthropic:…</code>, <code>openai:…</code>, <code>openai-chat:…</code>)</td></tr>
     <tr><td><code>--max-turns</code></td><td><code>100</code></td><td>Max agent turns</td></tr>
     <tr><td><code>--max-tokens</code></td><td><code>8192</code></td><td>Max tokens per LLM reply</td></tr>
-    <tr><td><code>--reasoning</code></td><td><code>enabled</code></td><td>Enable or disable reasoning for <code>claude_code</code> and <code>codex</code>. Setting it to <code>disabled</code> during evaluation can substantially reduce runtime while generally causing only a slight impact on performance.</td></tr>
+    <tr><td><code>--reasoning</code></td><td><code>disabled</code></td><td>Enable or disable reasoning for <code>claude_code</code> and <code>codex</code>. The default disabled mode substantially reduces evaluation runtime with generally only a slight impact on performance; enable reasoning when prioritizing task success rate.</td></tr>
     <tr><td><code>--no-images</code></td><td>off</td><td>Text-only mode: never send image bytes (for models that reject image input)</td></tr>
     <tr><td><code>--max-episode-steps</code></td><td><code>10000</code></td><td>Max env steps</td></tr>
     <tr><td><code>--libero-type</code></td><td><code>LIBERO_TYPE</code> or <code>pro</code></td><td>LIBERO variant: <code>standard</code> | <code>pro</code> | <code>plus</code></td></tr>

@@ -22,6 +22,7 @@ const COPY = {
     customModelPlaceholder: "provider:model or alias",
     noImages: "Disable image input (required for text-only models)",
     claudeBudget: "Claude Code budget USD",
+    plannerReasoning: "Reasoning (enable to improve success rate)",
     plannerTimeout: "Planner timeout s",
     cudaDevice: "CUDA device",
     blankDefault: "(blank = default)",
@@ -142,6 +143,7 @@ const COPY = {
     customModelPlaceholder: "provider:model 或别名",
     noImages: "禁用图像输入（纯文本模型必需）",
     claudeBudget: "Claude Code 预算 USD",
+    plannerReasoning: "推理（开启可提升成功率）",
     plannerTimeout: "Planner 超时秒数",
     cudaDevice: "CUDA 设备",
     blankDefault: "(留空=默认)",
@@ -1304,7 +1306,7 @@ function showLauncher(defaults) {
   set("#f-max-turns", d["max-turns"]);
   set("#f-max-episode-steps", d["max-episode-steps"]);
   set("#f-planner-timeout-s", d["planner-timeout-s"]);
-  set("#f-reasoning", d.reasoning || "enabled");
+  set("#f-reasoning", d.reasoning || "disabled");
   set("#f-claude-code-max-budget-usd", d["claude-code-max-budget-usd"]);
   set("#f-cuda-device", d["cuda-device"]);
   $("#f-no-images").checked = Boolean(d["no-images"]);

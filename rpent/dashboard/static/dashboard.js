@@ -48,7 +48,7 @@ const COPY = {
     composerKeys: "Enter to send · Shift+Enter for newline · Esc to interrupt",
     commandPlaceholder: (usage) => usage,
     commandKeys: (usage) => `Enter to submit · ${usage}`,
-    sessionStarting: "Starting shared environment services…",
+    sessionStarting: "Starting shared robot services…",
     commandReady: (usage) => `Ready for ${usage}.`,
     taskStarting: "Starting the selected TaskRun…",
     taskSwitchPending: (target) => `Task switch pending${target ? `: ${target}` : ""}.`,
@@ -56,7 +56,7 @@ const COPY = {
     taskRunStartingFeedback: (number) => `TaskRun ${number} starting…`,
     sessionFatal: "The Dashboard Session is unavailable.",
     dashboardConfigFailed: "Dashboard configuration is unavailable.",
-    interactionStarting: "Waiting for environment startup…",
+    interactionStarting: "Waiting for robot startup…",
     interactionReady: "The agent is ready for another message.",
     interactionBusy: "The agent is working; new messages will be queued.",
     interactionUnavailable: "The agent is not accepting messages yet.",
@@ -348,6 +348,7 @@ const mediaState = {
 };
 
 const AUTO_ACTION_RETURN_DELAY_MS = 300;
+const AUTO_PLAY_ACTION_VIDEOS = false;
 const MODEL_PRESETS = {
   claude_code: [
     "deepseek-v4-flash",
@@ -1141,7 +1142,8 @@ async function refreshMeta(opts = {}) {
     mediaState.lastActionStep = maxTimelineStep(r.timeline || []);
     mediaState.autoActionPrimed = true;
   }
-  const autoStarted = opts.autoPlayNewAction && mediaState.autoActionPrimed && !mediaState.autoPlayback
+  const autoStarted = AUTO_PLAY_ACTION_VIDEOS && opts.autoPlayNewAction
+    && mediaState.autoActionPrimed && !mediaState.autoPlayback
     ? maybeAutoPlayNewAction(r.timeline || [], opts.nextFrameIdx ?? r.frame_idx)
     : false;
   if (!r.has_video && mediaState.kind === "video") setFrameKind(defaultFrameKind());

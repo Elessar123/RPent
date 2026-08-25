@@ -423,12 +423,9 @@ class CodexPlanner:
             ),
             "cwd": self._repo_root,
             "env": env,
-            # Disable experimental API features (namespace tools,
-            # web_search, image_generation).  This forces the binary to
-            # convert namespace MCP tools to function tools internally
-            # while preserving its own name→namespace mapping so that
-            # ``function_call`` responses can be routed through MCP.
-            "experimental_api": False,
+            # use True to support (namespace tools,
+            # web_search, image_generation).
+            "experimental_api": True,
         }
         if codex_bin := os.environ.get("CODEX_BIN"):
             kwargs["codex_bin"] = codex_bin

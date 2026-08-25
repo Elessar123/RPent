@@ -308,6 +308,7 @@ def main() -> int:
         args,
         output_dir,
         dashboard_events,
+        None,
     )
 
     # --- agent loop --------------------------------------------------------

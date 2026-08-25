@@ -70,6 +70,7 @@ class ApiAgentLoop:
         model: Model,
         max_tokens: int = 8192,
         no_images: bool = False,
+        reasoning_effort: str = "none",
         *,
         dashboard_events: DashboardEventSink,
         timeout_s: int | None = None,
@@ -80,6 +81,9 @@ class ApiAgentLoop:
         self._dashboard_events = dashboard_events
         self._no_images = no_images
         self._timeout_s = timeout_s
+        if reasoning_effort not in {"none", "low", "medium", "high", "xhigh"}:
+            raise ValueError(f"unsupported reasoning effort: {reasoning_effort}")
+        self._reasoning_effort = reasoning_effort
 
     def solve(
         self,
@@ -349,7 +353,13 @@ class ApiAgentLoop:
             tools=_build_tools(toolkit, no_images=self._no_images),
             model_settings=_build_model_settings(self._model, self._max_tokens),
             capabilities=[
-                Thinking(effort="high"),
+                Thinking(
+                    effort=(
+                        False
+                        if self._reasoning_effort == "none"
+                        else self._reasoning_effort
+                    )
+                ),
                 ProcessHistory(processor=_prune_history_images),
             ],
         )

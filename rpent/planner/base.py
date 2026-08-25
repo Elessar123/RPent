@@ -109,7 +109,7 @@ def build_planner(
     model: str | None = None,
     max_tokens: int = 8192,
     planner_timeout_s: int | None = None,
-    reasoning: str = "disabled",
+    reasoning_effort: str = "none",
     claude_code_max_budget_usd: float | None = None,
     dashboard_events: DashboardEventSink,
     no_images: bool = False,
@@ -157,6 +157,7 @@ def build_planner(
         return ApiAgentLoop(
             model=api_model,
             max_tokens=max_tokens,
+            reasoning_effort=reasoning_effort,
             dashboard_events=dashboard_events,
             no_images=no_images,
             timeout_s=api_timeout_s,
@@ -179,7 +180,7 @@ def build_planner(
             extra_dirs=[str(get_memory_dir(env_name))],
             output_path=Path(output_dir) / f"claude_{recipe_tag}.txt",
             dashboard_events=dashboard_events,
-            reasoning=reasoning,
+            reasoning_effort=reasoning_effort,
         )
     if planner_type == "codex":
         from rpent.planner.codex import CodexPlanner
@@ -200,6 +201,6 @@ def build_planner(
             extra_dirs=[str(get_memory_dir(env_name))],
             output_path=Path(output_dir) / f"codex_{recipe_tag}.txt",
             dashboard_events=dashboard_events,
-            reasoning=reasoning,
+            reasoning_effort=reasoning_effort,
         )
     raise ValueError(f"unknown planner_type: {planner_type}")

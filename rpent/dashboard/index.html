@@ -45,10 +45,13 @@
           <input type="number" id="f-claude-code-max-budget-usd" min="0" step="0.01" placeholder="MAX_BUDGET_USD" />
         </div>
         <div class="lfield">
-          <label for="f-reasoning" data-i18n="plannerReasoning">Reasoning (enable to improve success rate)</label>
-          <select id="f-reasoning">
-            <option value="enabled">enabled</option>
-            <option value="disabled" selected>disabled</option>
+          <label for="f-reasoning-effort" data-i18n="plannerReasoningEffort">Reasoning effort (higher may improve success rate)</label>
+          <select id="f-reasoning-effort">
+            <option value="none" selected>none</option>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+            <option value="xhigh">xhigh</option>
           </select>
         </div>
         <div class="lfield">

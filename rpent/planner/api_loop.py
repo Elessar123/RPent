@@ -43,7 +43,7 @@ from rpent.dashboard.events import (
 )
 from rpent.dashboard.interaction import DashboardInteractionPort, DashboardMessage
 from rpent.dashboard.planner_control import DashboardPlannerControl
-from rpent.planner.base import PlannerResult
+from rpent.planner.base import REASONING_EFFORTS, PlannerResult
 from rpent.tools.state import EnvState
 from rpent.tools.toolkit import Toolkit
 from rpent.utils.logging import get_logger
@@ -81,7 +81,7 @@ class ApiAgentLoop:
         self._dashboard_events = dashboard_events
         self._no_images = no_images
         self._timeout_s = timeout_s
-        if reasoning_effort not in {"none", "low", "medium", "high", "xhigh"}:
+        if reasoning_effort not in REASONING_EFFORTS:
             raise ValueError(f"unsupported reasoning effort: {reasoning_effort}")
         self._reasoning_effort = reasoning_effort
 
@@ -347,19 +347,16 @@ class ApiAgentLoop:
 
     def _build_agent(self, system_prompt: str, toolkit: Toolkit) -> Agent:
         """Build an Agent for terminal or Dashboard execution."""
+        thinking_effort: str | bool = self._reasoning_effort
+        if thinking_effort == "none":
+            thinking_effort = False
         return Agent(
             self._model,
             instructions=system_prompt or None,
             tools=_build_tools(toolkit, no_images=self._no_images),
             model_settings=_build_model_settings(self._model, self._max_tokens),
             capabilities=[
-                Thinking(
-                    effort=(
-                        False
-                        if self._reasoning_effort == "none"
-                        else self._reasoning_effort
-                    )
-                ),
+                Thinking(effort=thinking_effort),
                 ProcessHistory(processor=_prune_history_images),
             ],
         )

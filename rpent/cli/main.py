@@ -38,7 +38,7 @@ from rpent.dashboard.events import (
     RunStartedEvent,
 )
 from rpent.envs import enumerate_envs, get_env_spec, get_toolkit
-from rpent.planner.base import build_planner
+from rpent.planner.base import REASONING_EFFORTS, build_planner
 from rpent.utils.logging import get_logger, init_output_dir
 from rpent.utils.resources import ensure_resources
 
@@ -109,8 +109,7 @@ def _build_argparser() -> argparse.ArgumentParser:
                     help="API base URL. Defaults to the selected backend's base URL env var.")
     ap.add_argument("--max-turns", type=int, default=100)
     ap.add_argument("--max-tokens", type=int, default=8192)
-    ap.add_argument("--reasoning-effort",
-                    choices=["none", "low", "medium", "high", "xhigh"],
+    ap.add_argument("--reasoning-effort", choices=REASONING_EFFORTS,
                     default="none",
                     help="Planner reasoning effort for api, claude_code, and "
                          "codex. Higher effort may improve task success rate "

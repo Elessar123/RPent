@@ -34,7 +34,7 @@ from rpent.dashboard.events import (
 )
 from rpent.dashboard.interaction import DashboardInteractionPort
 from rpent.dashboard.planner_control import DashboardPlannerControl
-from rpent.planner.base import PlannerResult, strip_mcp_prefix
+from rpent.planner.base import REASONING_EFFORTS, PlannerResult, strip_mcp_prefix
 from rpent.planner.utils.http_mcp_server import HttpMcpServer
 from rpent.tools.toolkit import Toolkit
 from rpent.utils.config import get_repo_root
@@ -75,7 +75,7 @@ class CodexPlanner:
         self._base_url = os.environ.get("CODEX_BASE_URL", None)
         self._api_key = os.environ.get("CODEX_API_KEY", None)
         self._dashboard_events = dashboard_events
-        if reasoning_effort not in {"none", "low", "medium", "high", "xhigh"}:
+        if reasoning_effort not in REASONING_EFFORTS:
             raise ValueError(f"unsupported reasoning effort: {reasoning_effort}")
         self._turn_options = {
             "approval_mode": openai_codex.ApprovalMode.deny_all,

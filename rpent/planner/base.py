@@ -18,6 +18,7 @@ from rpent.utils.config import (
 #: MCP namespace prefix for RPent tools (``mcp__<server>__<tool>``).
 #: Toolkits expose plain tool names; planners add/strip this prefix.
 MCP_TOOL_PREFIX = "mcp__rpent__"
+REASONING_EFFORTS = ("none", "low", "medium", "high", "xhigh")
 
 
 def add_mcp_prefix(name: str) -> str:

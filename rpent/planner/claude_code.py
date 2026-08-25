@@ -30,6 +30,7 @@ from rpent.dashboard.events import (
 from rpent.dashboard.interaction import DashboardInteractionPort
 from rpent.dashboard.planner_control import DashboardPlannerControl
 from rpent.planner.base import (
+    REASONING_EFFORTS,
     PlannerResult,
     add_mcp_prefix,
     strip_mcp_prefix,
@@ -74,7 +75,7 @@ class ClaudeCodePlanner:
         self._extra_dirs = extra_dirs or []
         self._output_path = Path(output_path) if output_path else None
         self._dashboard_events = dashboard_events
-        if reasoning_effort not in {"none", "low", "medium", "high", "xhigh"}:
+        if reasoning_effort not in REASONING_EFFORTS:
             raise ValueError(f"unsupported reasoning effort: {reasoning_effort}")
         self._reasoning_effort = reasoning_effort
 
@@ -325,6 +326,8 @@ class ClaudeCodePlanner:
             add_mcp_prefix(str(spec["name"])) for spec in toolkit.get_tools_spec()
         )
 
+        thinking = {"type": "disabled"} if self._reasoning_effort == "none" else None
+        effort = None if self._reasoning_effort == "none" else self._reasoning_effort
         return sdk.ClaudeAgentOptions(
             cwd=self._repo_root,
             model=self._model,
@@ -342,14 +345,8 @@ class ClaudeCodePlanner:
             add_dirs=[self._output_dir, *self._extra_dirs],
             # Ignore user/project .claude configuration; RPent owns the loop.
             setting_sources=[],
-            thinking=(
-                {"type": "disabled"}
-                if self._reasoning_effort == "none"
-                else None
-            ),
-            effort=(
-                None if self._reasoning_effort == "none" else self._reasoning_effort
-            ),
+            thinking=thinking,
+            effort=effort,
             stderr=lambda line: logger.debug("[claude-sdk] %s", line.rstrip()),
         )
 

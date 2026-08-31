@@ -36,6 +36,13 @@ from rpent.utils.logging import get_logger
 from rpent.utils.rpc.rpc_client import RpcClient, RpcError, check_response
 from rpent.utils.rpc.rpc_facade import make_error_response
 
+# Every RPC here is loopback to a server this process (or its launcher) started.
+# ``urlopen`` otherwise honours http_proxy/https_proxy from the environment and
+# sends those requests to the proxy, which answers with an empty body -- the
+# readiness poll then fails with "invalid JSON response" until it times out,
+# with a healthy server listening the whole time.
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 DEFAULT_TIMEOUT_S = 30.0
 
 logger = get_logger("http_rpc")
@@ -97,7 +104,7 @@ class HttpRpcClient(RpcClient):
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=request_timeout) as resp:
+            with _OPENER.open(req, timeout=request_timeout) as resp:
                 raw = resp.read()
         except urllib.error.HTTPError as exc:
             # HTTPError is an OSError subclass; catch first so we can parse

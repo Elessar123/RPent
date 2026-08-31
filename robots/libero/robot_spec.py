@@ -90,6 +90,13 @@ LIBERO_DASHBOARD_SPEC = {
 }
 
 
+def _replay_card(toolkit, cell_tag: str, note) -> dict:
+    """Replay a recorded card for one cell. Imported late: it loads numpy."""
+    from robots.libero.task_card import replay_card
+
+    return replay_card(toolkit, cell_tag, note)
+
+
 def get_robot_spec() -> RobotSpec:
     """Return the LIBERO robot identity, prompt bundle, and runner hooks.
 
@@ -106,6 +113,7 @@ def get_robot_spec() -> RobotSpec:
         parse_config=_parse_config,
         init_runtime=_init_runtime,
         dashboard=LIBERO_DASHBOARD_SPEC,
+        replay_card=_replay_card,
     )
 
 

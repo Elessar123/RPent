@@ -1,5 +1,5 @@
-任务卡
-======
+任务卡模式
+==========
 
 只记录了绝对路点的方案，无法跟随移动过的物体。而如果同时记录下 *定位了什么*
 以及 *每个路点离那次读数有多远*，就可以：偏移是任务逻辑，换个布局依然成立，
@@ -40,15 +40,35 @@ Molmo 配置
 是这个短语"，Molmo 回答的是"你会把夹爪放在哪里"——一个开放词表的点，面向那些
 掩膜候选叫不出名字的短语。
 
-Molmo 需要比策略更新的 ``transformers``，因此通常运行在自己的解释器下，通过
-``PYTHONPATH`` 找到 RPent：
+Molmo 装在自己的独立环境里，与 LIBERO 环境分开。新建该环境、装上 ``molmo``
+extra，然后从
+`Hugging Face: allenai/Molmo2-8B <https://huggingface.co/allenai/Molmo2-8B>`_
+或 `ModelScope: allenai/Molmo2-8B
+<https://modelscope.cn/models/allenai/Molmo2-8B>`_ 下载权重，并通过
+``MOLMO_CHECKPOINT_PATH`` 指向它：
 
 .. code-block:: bash
 
+   uv venv --python 3.11 /path/to/molmo-venv
+   /path/to/molmo-venv/bin/pip install -e ".[molmo]"
+
+   # Hugging Face
+   hf download allenai/Molmo2-8B --local-dir /path/to/Molmo2-8B
+
+   # ModelScope（用它替代上面的 Hugging Face 命令）
+   modelscope download --model allenai/Molmo2-8B --local_dir /path/to/Molmo2-8B
+
    export MOLMO_CHECKPOINT_PATH=/path/to/Molmo2-8B
+
+用该环境的解释器启动服务：
+
+.. code-block:: bash
+
    PYTHONPATH=/path/to/RPent /path/to/molmo-venv/bin/python \
      rpent/robots/components/molmo_server.py \
      --transport http --host 127.0.0.1 --port 20703
+
+下面两个入口都是连接该服务的地址，而不是自己去启动它。
 
 重放单个 episode
 ----------------
@@ -58,9 +78,9 @@ Molmo 需要比策略更新的 ``transformers``，因此通常运行在自己的
 
 .. code-block:: bash
 
-   MOLMO_ENDPOINT=http://127.0.0.1:20703 \
-     rpent --robot libero --planner task_card \
-     --suite libero_object_swap --task 3 --seed 0
+   rpent --robot libero --planner task_card \
+     --suite libero_object_swap --task 3 --seed 0 \
+     --molmo-endpoint http://127.0.0.1:20703
 
 语料里每个任务只有一张卡，所以 seed 选的是要解决的布局，而不是用来解决它的
 方案。
@@ -68,16 +88,22 @@ Molmo 需要比策略更新的 ``transformers``，因此通常运行在自己的
 重放整轮扫描
 ------------
 
-``robots.libero.task_card.run`` 不经过 CLI 驱动大量 episode。它连接已经在提供服务的策略、
-分割器和定位器，并为每个 episode 启动一个环境服务：
+整轮扫描就是同一条命令跑更多 cell。把各个端点都指向已经在提供服务的模型，
+这样一整轮只加载一次：
 
 .. code-block:: bash
 
-   python -m robots.libero.task_card.run \
-     --family object --tasks swap_t3 --seeds 0 1 2 \
-     --vla-endpoint http://127.0.0.1:20701 \
-     --sam3-endpoint http://127.0.0.1:20702 \
-     --molmo-endpoint http://127.0.0.1:20703
+   for seed in $(seq 0 9); do
+     rpent --robot libero --planner task_card \
+       --suite libero_object_swap --task 3 --seed "$seed" \
+       --output-dir logs/sweep/swap_t3_s$seed \
+       --vla-endpoint http://127.0.0.1:20701 \
+       --sam3-endpoint http://127.0.0.1:20702 \
+       --molmo-endpoint http://127.0.0.1:20703
+   done
+
+   # 数一下解出了几个
+   grep -l '"status": "success"' logs/sweep/*/transcript_*.json | wc -l
 
 评测是单次尝试且不重置环境：失败的 episode 记为失败，不会从干净状态重来。
 
@@ -98,29 +124,10 @@ Molmo 需要比策略更新的 ``transformers``，因此通常运行在自己的
 配置项
 ------
 
-两个入口都支持 ``--help``。要点如下：
-
-.. list-table::
-   :header-rows: 1
-   :widths: 32 68
-
-   * - 选项
-     - 含义
-   * - ``--family``
-     - 扰动族：``object``、``goal``、``spatial`` 或 ``10``。
-   * - ``--tasks``
-     - 任务键，如 ``swap_t3 swap_t5``。默认该族下的全部卡。
-   * - ``--seeds``
-     - 每张卡要重放到哪些 seed 上。默认 ``0``--``9``。
-   * - ``--cards``
-     - 任务卡语料目录，默认 ``resources/libero/task_card``。
-   * - ``--output-dir``
-     - 每个 episode 的输出写到哪里。
-   * - ``--vla-endpoint`` / ``--sam3-endpoint`` / ``--molmo-endpoint``
-     - 已在提供服务的策略、分割器、定位器地址（仅批量重放）。
-
-``--planner task_card`` 的定位器地址取自 ``MOLMO_ENDPOINT``——planner 的构建
-早于机器人运行时解析自己的参数。
+除了常规的 LIBERO 运行参数之外没有别的东西要配。``--suite`` / ``--task`` /
+``--seed`` 指定 cell，卡由任务本身决定。唯一新增的是 ``--molmo-endpoint``：
+指向一个已在提供服务的定位器。Molmo 的 ``transformers`` 依赖与策略环境冲突，
+因此它需要运行在独立环境中，RPent 不会用当前 Python 解释器代为启动。
 
 哪次录制成为了卡
 ----------------

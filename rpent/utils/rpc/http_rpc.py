@@ -24,8 +24,10 @@ and the decode is explicit.
 from __future__ import annotations
 
 import base64
+import ipaddress
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
@@ -35,13 +37,6 @@ import numpy as np
 from rpent.utils.logging import get_logger
 from rpent.utils.rpc.rpc_client import RpcClient, RpcError, check_response
 from rpent.utils.rpc.rpc_facade import make_error_response
-
-# Every RPC here is loopback to a server this process (or its launcher) started.
-# ``urlopen`` otherwise honours http_proxy/https_proxy from the environment and
-# sends those requests to the proxy, which answers with an empty body -- the
-# readiness poll then fails with "invalid JSON response" until it times out,
-# with a healthy server listening the whole time.
-_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 DEFAULT_TIMEOUT_S = 30.0
 
@@ -78,6 +73,8 @@ class HttpRpcClient(RpcClient):
     def __init__(self, base_url: str) -> None:
         """Initialize with a base URL, e.g. ``"http://127.0.0.1:8080"``."""
         self._base_url = base_url.rstrip("/")
+        hostname = urllib.parse.urlsplit(self._base_url).hostname
+        self._opener = _build_opener(hostname)
 
     def call(
         self,
@@ -104,7 +101,7 @@ class HttpRpcClient(RpcClient):
             method="POST",
         )
         try:
-            with _OPENER.open(req, timeout=request_timeout) as resp:
+            with self._opener.open(req, timeout=request_timeout) as resp:
                 raw = resp.read()
         except urllib.error.HTTPError as exc:
             # HTTPError is an OSError subclass; catch first so we can parse
@@ -119,6 +116,19 @@ class HttpRpcClient(RpcClient):
             raise RpcError(method, f"invalid JSON response: {exc}") from exc
 
         return check_response(response, method)
+
+
+def _build_opener(hostname: str | None) -> urllib.request.OpenerDirector:
+    """Bypass environment proxies for loopback RPC, but preserve remote proxies."""
+    is_loopback = hostname == "localhost"
+    if hostname is not None and not is_loopback:
+        try:
+            is_loopback = ipaddress.ip_address(hostname).is_loopback
+        except ValueError:
+            pass
+    if is_loopback:
+        return urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    return urllib.request.build_opener()
 
 
 # ---------------------------------------------------------------------------

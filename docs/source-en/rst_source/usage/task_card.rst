@@ -43,15 +43,35 @@ Replay grounds hand-picked pixels with **Molmo**, served by
 are this phrase", Molmo answers "where would you put the gripper" -- an
 open-vocabulary point, for phrases no mask proposal names.
 
-Molmo needs a newer ``transformers`` than the policy does, so it usually runs
-under its own interpreter, which finds RPent through ``PYTHONPATH``:
+Molmo installs into its own environment, separate from the LIBERO one. Create
+it, install the ``molmo`` extra, then download the weights from
+`Hugging Face: allenai/Molmo2-8B <https://huggingface.co/allenai/Molmo2-8B>`_
+or `ModelScope: allenai/Molmo2-8B
+<https://modelscope.cn/models/allenai/Molmo2-8B>`_ and point at them via
+``MOLMO_CHECKPOINT_PATH``:
 
 .. code-block:: bash
 
+   uv venv --python 3.11 /path/to/molmo-venv
+   /path/to/molmo-venv/bin/pip install -e ".[molmo]"
+
+   # Hugging Face
+   hf download allenai/Molmo2-8B --local-dir /path/to/Molmo2-8B
+
+   # ModelScope (use this instead of the Hugging Face command above)
+   modelscope download --model allenai/Molmo2-8B --local_dir /path/to/Molmo2-8B
+
    export MOLMO_CHECKPOINT_PATH=/path/to/Molmo2-8B
+
+Serve it with that interpreter:
+
+.. code-block:: bash
+
    PYTHONPATH=/path/to/RPent /path/to/molmo-venv/bin/python \
      rpent/robots/components/molmo_server.py \
      --transport http --host 127.0.0.1 --port 20703
+
+Both entry points below take the server's address rather than starting it.
 
 Replaying one episode
 ---------------------
@@ -62,9 +82,9 @@ the run is unchanged:
 
 .. code-block:: bash
 
-   MOLMO_ENDPOINT=http://127.0.0.1:20703 \
-     rpent --robot libero --planner task_card \
-     --suite libero_object_swap --task 3 --seed 0
+   rpent --robot libero --planner task_card \
+     --suite libero_object_swap --task 3 --seed 0 \
+     --molmo-endpoint http://127.0.0.1:20703
 
 The corpus holds one card per task, so the seed selects the layout to solve,
 never the plan used to solve it.
@@ -72,17 +92,22 @@ never the plan used to solve it.
 Replaying a whole sweep
 -----------------------
 
-``robots.libero.task_card.run`` drives many episodes without the CLI. It
-connects to a policy, a segmenter and a grounder that are already serving, and
-starts an environment server per episode:
+A sweep is that same command over more cells. Point every endpoint at a
+already-serving model so the sweep pays to load them once:
 
 .. code-block:: bash
 
-   python -m robots.libero.task_card.run \
-     --family object --tasks swap_t3 --seeds 0 1 2 \
-     --vla-endpoint http://127.0.0.1:20701 \
-     --sam3-endpoint http://127.0.0.1:20702 \
-     --molmo-endpoint http://127.0.0.1:20703
+   for seed in $(seq 0 9); do
+     rpent --robot libero --planner task_card \
+       --suite libero_object_swap --task 3 --seed "$seed" \
+       --output-dir logs/sweep/swap_t3_s$seed \
+       --vla-endpoint http://127.0.0.1:20701 \
+       --sam3-endpoint http://127.0.0.1:20702 \
+       --molmo-endpoint http://127.0.0.1:20703
+   done
+
+   # how many solved
+   grep -l '"status": "success"' logs/sweep/*/transcript_*.json | wc -l
 
 Evaluation is single-attempt with no environment reset: a failed episode is
 scored as failed, not retried from a clean state.
@@ -108,30 +133,12 @@ taller the object. The correction is linear in the object's measured height.
 Configuration
 -------------
 
-Both entry points take ``--help``. The options that matter:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 32 68
-
-   * - Option
-     - Meaning
-   * - ``--family``
-     - Perturbation family: ``object``, ``goal``, ``spatial`` or ``10``.
-   * - ``--tasks``
-     - Task keys, e.g. ``swap_t3 swap_t5``. Default: every card in the family.
-   * - ``--seeds``
-     - Seeds to replay each card against. Default: ``0``--``9``.
-   * - ``--cards``
-     - Card corpus. Defaults to ``resources/libero/task_card``.
-   * - ``--output-dir``
-     - Where per-episode output is written.
-   * - ``--vla-endpoint`` / ``--sam3-endpoint`` / ``--molmo-endpoint``
-     - The already-serving policy, segmenter and grounder
-       (the sweep only).
-
-``--planner task_card`` takes its grounder from ``MOLMO_ENDPOINT``, since the
-planner is built before the robot runtime parses its own arguments.
+There is nothing to configure beyond the usual LIBERO run. ``--suite`` /
+``--task`` / ``--seed`` name the cell, and the card follows from the task.
+The one required addition is ``--molmo-endpoint``: an already-serving
+grounder. Molmo runs in a separate environment because its ``transformers``
+requirement conflicts with the policy environment, so RPent does not start it
+with the current Python interpreter.
 
 Which recording became the card
 -------------------------------

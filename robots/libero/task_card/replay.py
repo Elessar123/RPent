@@ -30,19 +30,18 @@ else cannot overwrite a correct answer.
 from __future__ import annotations
 
 import json
-import os
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 
 from robots.libero import tools as libero_tools
 from robots.libero.task_card.prompts import build as prompt_for
 from rpent.robots.components.molmo_client import MolmoClient
-from rpent.session.base import EnvState
+from rpent.session import EnvState
 from rpent.utils.config import get_resources_dir
-from rpent.utils.rpc import make_rpc_client
 
 #: ``<family>_<suite>_t<task>_s<seed>``, the tag the CLI builds per cell.
 _CELL = re.compile(r"^(10|goal|object|spatial)_(task|swap)_t(\d+)_s(\d+)$")
@@ -102,7 +101,7 @@ def profile(
         return None
     array = np.array(points)
     keep = array[array[:, 2] > array[:, 2].max() - 0.03]
-    span = float(keep[:, 2].ptp())
+    span = float(np.ptp(keep[:, 2]))
     centre = np.median(keep[:, :2], 0)
     return {
         "xy": centre,
@@ -163,7 +162,7 @@ def held_body(molmo: MolmoClient, state: EnvState, step: int, query: str):
     near = array[np.linalg.norm(array[:, :2] - centre, axis=1) < 0.05]
     if len(near) < 3:
         return None
-    span = float(array[:, 2].ptp())
+    span = float(np.ptp(array[:, 2]))
     return {
         "xy": np.median(near[:, :2], 0)
         - np.array(
@@ -190,6 +189,16 @@ def action_result(raw):
     if isinstance(log, dict) and isinstance(log.get("result"), dict):
         return log["result"]
     return raw
+
+
+def execute(toolkit: Any, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """Execute one toolkit action and turn its error result into an exception."""
+    result = toolkit.execute_tool(name, arguments).result
+    if not isinstance(result, dict):
+        raise RuntimeError(f"{name} returned an invalid result: {result!r}")
+    if error := result.get("error"):
+        raise RuntimeError(f"{name} failed: {error}")
+    return result
 
 
 def pick_confirmed(raw) -> bool:
@@ -261,39 +270,50 @@ def replay(
     place by replaying its approach, and its carry is skipped if it still does
     not, but the environment is never reset back to a clean state.
     """
-    primitives = toolkit._primitives
-    env = primitives.env
     plan = card["plan"]
     reference = card["reference"]
     source_of = card["source_of"]
 
     state = toolkit.state
 
-    step = [0]
-
     def look() -> int:
-        libero_tools.dump_state(primitives, state)
-        step[0] = state.latest_step
-        return step[0]
+        """The step the toolkit recorded for the action just executed.
+
+        Every tool that moves the arm records one on its way out, so this only
+        has to name it -- dumping again would file the same observation twice.
+        """
+        step = state.latest_step
+        if step is None:
+            raise RuntimeError("task-card replay requires an initialized environment")
+        return step
 
     def finished() -> bool:
         return bool(toolkit.solved())
 
-    # Record the scene this seed laid out, not the one the env was built
-    # with: dumping before the reset gives every seed the same picture.
-    primitives.set_obs(env.reset()[0])
+    # Toolkit initialization resets the environment and records its opening
+    # observation before the planner starts.
     opening = look()
 
     live: dict[str, np.ndarray] = {}
     for phrase in reference:
         if source_of.get(phrase) == "segment":
-            found = primitives.segment(
-                prompt=phrase,
-                camera="agentview",
-                step=opening,
-                min_score=0.2,
-                state=state,
-            )
+            # One phrase the segmenter cannot place must not end the episode:
+            # the rest of the anchors, and the actions that hang off them,
+            # are still worth running.
+            try:
+                found = execute(
+                    toolkit,
+                    "segment",
+                    {
+                        "prompt": phrase,
+                        "camera": "agentview",
+                        "step": opening,
+                        "min_score": 0.2,
+                    },
+                )
+            except RuntimeError as exc:
+                note(f"      {phrase[:26]!r} segmentation failed: {exc}")
+                found = {}
             world = found.get("world_xyz") if isinstance(found, dict) else None
             xy = (
                 np.array(world[:2], dtype=float)
@@ -331,16 +351,20 @@ def replay(
             continue
         coarse = live[phrase]
         try:
-            primitives.move_to(
-                xyz=[
-                    round(float(coarse[0]), 4),
-                    round(float(coarse[1]), 4),
-                    float(hover),
-                ],
-                gripper=-1,
-                step_clip=0.02,
-                max_steps=150,
-                tol=0.012,
+            execute(
+                toolkit,
+                "move_to",
+                {
+                    "xyz": [
+                        round(float(coarse[0]), 4),
+                        round(float(coarse[1]), 4),
+                        float(hover),
+                    ],
+                    "gripper": -1,
+                    "step_clip": 0.02,
+                    "max_steps": 150,
+                    "tol": 0.012,
+                },
             )
         except Exception:
             continue
@@ -393,7 +417,7 @@ def replay(
                     round(float(target[1]), 4),
                     float(xyz[2]),
                 ]
-                toolkit.execute_tool(name, arguments)
+                execute(toolkit, name, arguments)
                 look()
             elif name in {"segment", "segment_point"}:
                 continue
@@ -403,15 +427,15 @@ def replay(
                 held_phrase = re.split(r"\b(on|in|into|inside|by|and)\b", stripped)[
                     0
                 ].strip()
-                raw = toolkit.execute_tool(name, arguments).result
+                raw = execute(toolkit, name, arguments)
                 look()
                 if name == "pi0_pick" and not pick_confirmed(raw):
                     for _ in range(PICK_ATTEMPTS - 1):
                         if finished():
                             break
                         for again, again_args in recent:
-                            toolkit.execute_tool(again, dict(again_args))
-                        raw = toolkit.execute_tool(name, dict(arguments)).result
+                            execute(toolkit, again, dict(again_args))
+                        raw = execute(toolkit, name, dict(arguments))
                         look()
                         if pick_confirmed(raw):
                             break
@@ -419,9 +443,12 @@ def replay(
                         note("      pick unconfirmed, skipping its carry")
                         skip_suffix = True
             elif name == "set_gripper":
-                toolkit.execute_tool(name, arguments)
-                body = held_body(molmo, state, look(), prompt_for("held", held_phrase))
-                eef = np.asarray(primitives.env.raw_obs()["robot0_eef_pos"][:2])
+                execute(toolkit, name, arguments)
+                held_step = look()
+                body = held_body(
+                    molmo, state, held_step, prompt_for("held", held_phrase)
+                )
+                eef = np.asarray(state.get(held_step).state["robot0_eef_pos"][:2])
                 candidate = body["xy"] - eef if body is not None else None
                 if candidate is not None and np.linalg.norm(candidate) <= MAX_HELD:
                     offset = candidate
@@ -429,11 +456,11 @@ def replay(
                 else:
                     offset = np.zeros(2)
             elif name == "release":
-                toolkit.execute_tool(name, arguments)
+                execute(toolkit, name, arguments)
                 offset = np.zeros(2)
                 look()
             else:
-                toolkit.execute_tool(name, arguments)
+                execute(toolkit, name, arguments)
                 look()
         except Exception as exc:
             note(f"      {name} raised {type(exc).__name__}: {str(exc)[:70]}")
@@ -469,7 +496,10 @@ def replay_card(
     if not (folder / "plan.json").is_file():
         raise FileNotFoundError(f"no task card for {family}/{key} under {CARDS}")
 
-    endpoint = os.environ.get("MOLMO_ENDPOINT", "http://127.0.0.1:8115")
-    molmo = MolmoClient(make_rpc_client(endpoint))
+    molmo = toolkit.primitives.molmo_client
+    if molmo is None:
+        raise RuntimeError(
+            "no grounder: task cards need a Molmo server named by --molmo-endpoint"
+        )
     note(f"replaying the {family}/{key} card")
     return {**replay(toolkit, molmo, load(folder), note), "card": f"{family}/{key}"}

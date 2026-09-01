@@ -19,9 +19,8 @@ Run manually with::
         python -m rpent.robots.components.molmo_server \
         --transport http --host 127.0.0.1 --port 8115
 
-Molmo needs a newer ``transformers`` than the policy does, so this usually runs
-under its own interpreter -- hence the explicit ``PYTHONPATH``, which is how
-that interpreter finds RPent.
+Runs under the ``molmo`` extra's own interpreter, which does not have RPent
+installed -- hence the explicit ``PYTHONPATH``.
 
 Where SAM3 answers "which pixels are this phrase", Molmo answers "where would
 you put the gripper" -- an open-vocabulary point on a named object, for phrases
@@ -48,8 +47,23 @@ from rpent.utils.rpc import RpcFacade
 
 logger = get_logger("molmo_server")
 
-#: Molmo answers with ``<point x=".." y="..">`` markup in normalised thousandths.
-_POINT = re.compile(r"coords=[\"'](?:[0-9.]+\s+){2}([0-9.]+)\s+([0-9.]+)[\"']", re.I)
+#: Molmo2 writes one or more ``point-id x y`` triples in normalized thousandths.
+_COORDS = re.compile(r"<(?:point|points)\b[^>]*\bcoords=[\"']([^\"']+)[\"']", re.I)
+_POINT = re.compile(r"(?:^|[\t:;,])\s*\d+\s+([0-9]{1,4})\s+([0-9]{1,4})")
+
+
+def _parse_point(answer: str) -> tuple[float, float] | None:
+    """Return the first normalized Molmo2 point from generated markup."""
+    coords = _COORDS.search(answer)
+    if coords is None:
+        return None
+    point = _POINT.search(coords.group(1))
+    if point is None:
+        return None
+    x, y = float(point.group(1)), float(point.group(2))
+    if not (0 <= x <= 1000 and 0 <= y <= 1000):
+        return None
+    return x, y
 
 
 class GroundRequest(BaseModel):
@@ -136,12 +150,13 @@ class MolmoEngine:
         answer = self._processor.tokenizer.decode(
             generated[0, inputs["input_ids"].shape[1] :], skip_special_tokens=False
         )
-        match = _POINT.search(answer)
+        normalized = _parse_point(answer)
         point = None
-        if match:
+        if normalized is not None:
+            x, y = normalized
             point = [
-                float(match.group(1)) / 1000 * width,
-                float(match.group(2)) / 1000 * height,
+                x / 1000 * width,
+                y / 1000 * height,
             ]
         return GroundResponse(point_xy=point, answer=answer, image_size=[width, height])
 
@@ -156,7 +171,7 @@ class MolmoFacade(RpcFacade):
     def _dispatch(self, method: str, args: tuple, kwargs: dict) -> Any:
         if method == "ground":
             return self.ground(*args, **kwargs)
-        raise ValueError(f"unknown RPC method: {method!r}")
+        return super()._dispatch(method, args, kwargs)
 
     def ground(self, image_base64: str, query: str) -> dict[str, Any]:
         request = GroundRequest(image_base64=image_base64, query=query)

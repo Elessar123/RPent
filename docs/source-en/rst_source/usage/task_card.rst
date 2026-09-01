@@ -139,17 +139,3 @@ The one required addition is ``--molmo-endpoint``: an already-serving
 grounder. Molmo runs in a separate environment because its ``transformers``
 requirement conflicts with the policy environment, so RPent does not start it
 with the current Python interpreter.
-
-Which recording became the card
--------------------------------
-
-A card is one solved episode, and not every solved episode makes a good card.
-Replaying all eight successful ``object/swap_t0`` recordings across ten seeds
-gives 9/10 down to 1/10, and the two extremes have identical action counts,
-pick counts and chunk budgets: solving a task once shows that the plan worked
-on that layout, not that it transfers, and nothing in a plan's shape says which
-it is.
-
-So the card in the corpus is the recording that was measured to transfer, not
-the one that looked best. That is a property of how the corpus was built,
-settled before it shipped -- there is no card selection at run time.

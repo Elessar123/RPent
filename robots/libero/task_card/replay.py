@@ -17,14 +17,13 @@ The card supplies the actions; perception supplies the coordinates. Each anchor
 is re-read through the interface it was first read through -- a `segment` anchor
 is re-segmented, because its offsets are relative to a mask centroid, and a wide
 container seen at an angle has that centroid some way from where a pointing
-model points. Only the pixels the recording planner chose by eye go to the
-grounder.
+model points. Point-grounded anchors are localized through the grounder.
 
-Localization is two-stage, as the recording planner's was: a coarse survey of
-the opening frame, then the arm parks over each hand-picked anchor and asks
-again from the wrist, where the object fills the view. The close reading is kept
-only when it agrees with the coarse one, so a wrist view that found something
-else cannot overwrite a correct answer.
+Localization is two-stage: a coarse survey of the opening frame, then the arm
+parks over each point-grounded anchor and asks again from the wrist, where the
+object fills the view. The close reading is kept only when it agrees with the
+coarse one, so a wrist view that found something else cannot overwrite a
+correct answer.
 """
 
 from __future__ import annotations
@@ -60,8 +59,7 @@ REACH = 0.45
 #: How far a held object can plausibly sit from the gripper holding it.
 MAX_HELD = 0.06
 #: A wrist reading of a held object lands short of its centre, further the
-#: taller it is. Fitted against the simulator's own poses: 35 mm of error
-#: becomes 2.5 mm.
+#: taller it is. These coefficients correct that height-dependent parallax.
 PARALLAX = {"x": (0.0231, 0.0610), "y": (-0.0029, 0.2056)}
 #: How many times a pick that did not take hold is retried by replaying its
 #: approach. No reset is involved; the episode continues.
@@ -336,7 +334,7 @@ def replay(
         + "  ".join(f"{p[:18]}=({a[0]:+.3f},{a[1]:+.3f})" for p, a in live.items())
     )
 
-    # Park over each hand-picked anchor and read it again from close range,
+    # Park over each point-grounded anchor and read it again from close range,
     # keeping the second reading only when it agrees with the first.
     hover = max(
         (

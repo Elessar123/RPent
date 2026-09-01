@@ -29,7 +29,7 @@ the card, and the card plus live grounding produces the trajectory.
      object/swap_t3/
        anchors.json             phrases localized, their readings, the anchor each yields
        plan.json                every action, with the anchor and offset behind its coordinate
-       trace.md                 the same to read, with the recording planner's reasoning
+       trace.md                 a human-readable trace of the recorded actions
 
 No seed appears in the corpus. A card serves its task whatever layout it is
 replayed against; the episode it was recorded from is kept inside the card as
@@ -38,7 +38,7 @@ replayed against; the episode it was recorded from is kept inside the card as
 Molmo configuration
 -------------------
 
-Replay grounds hand-picked pixels with **Molmo**, served by
+Replay grounds point-based anchors with **Molmo**, served by
 ``rpent/robots/components/molmo_server.py``. Where SAM3 answers "which pixels
 are this phrase", Molmo answers "where would you put the gripper" -- an
 open-vocabulary point, for phrases no mask proposal names.
@@ -118,14 +118,14 @@ How a reading becomes a waypoint
 Each anchor is re-read **through the interface it was first read through**. A
 ``segment`` anchor is re-segmented, because its offsets are relative to a mask
 centroid, and a wide container seen at an angle has that centroid some way from
-where a pointing model points. Only pixels the recording agent chose by eye are
-answered by the grounder.
+where a pointing model points. Point-grounded anchors are answered by the
+grounder.
 
-Localization is two-stage, as the recording planner's was: a coarse survey of the
-opening frame, then the arm parks over each hand-picked anchor and asks again
-from the wrist, where the object fills the view. The close reading is kept only
-when it agrees with the coarse one within 5 cm, so a wrist view that found
-something else cannot overwrite a correct answer.
+Localization is two-stage: a coarse survey of the opening frame, then the arm
+parks over each point-grounded anchor and asks again from the wrist, where the
+object fills the view. The close reading is kept only when it agrees with the
+coarse one within 5 cm, so a wrist view that found something else cannot
+overwrite a correct answer.
 
 A wrist reading of a *held* object lands short of its centre, further the
 taller the object. The correction is linear in the object's measured height.

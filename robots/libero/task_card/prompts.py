@@ -11,49 +11,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Prompts for each moment the recording planner stopped to look.
+"""Visual-grounding queries used at each stage of task-card replay.
 
-A planner does not localize once. It takes a coarse reading of the whole scene,
-flies the arm over each object in turn, and asks a narrower question from close
-range -- and the question changes with the situation. On the mug it was
-recovering from a mask that had leaked onto the table; on the plate it was
-finding the middle of a flat surface; on the pudding it was reading the label to
-confirm it had the right box. Those are different questions, so they get
-different wordings.
-
-The object noun is the card's own, so these are templates over it rather than
-new task knowledge.
+The object noun comes from the card. These templates add only the spatial or
+visual context needed by each localization stage.
 """
 
 PROMPTS = {
-    # ---- 1. Opening survey, agentview, everything in one frame ------------
-    # Codex: segment each entity, check the overlay, then back-project four
-    # pixels down the mask's midline. The recipe's phrase is the query.
+    # Opening survey from the fixed camera.
     "survey": "{object}",
-    # ---- 2. Close refinement, wrist, arm parked above the object ----------
-    # Codex reads the wrist view and names the object's centre in pixels. From
-    # here the object fills the frame, so the query can say where the arm is
-    # rather than how the object looks.
+    # Close refinement from the wrist camera with the arm above the object.
     "refine": "the center of the {object} directly below the gripper",
-    # ---- 3. Recovery when the reading fell off the object -----------------
-    # Codex: "the point mask leaked to table, but an interior wall sample
-    # gives ...". It re-picks a point on the object's own surface, away from
-    # the rim the mask escaped through.
+    # Recovery when a point falls outside the object's surface.
     "recover": "a point on the body surface of the {object}, not the table behind it",
-    # ---- 4. Identity confirmation ----------------------------------------
-    # Codex: "the wrist view reads 'CHOCOLATE PUDDING', confirming identity".
-    # It is checking that the thing under the gripper is the thing it meant,
-    # by something written or printed on it.
+    # Identity confirmation using visible text on the object.
     "confirm": "the printed label on the {object}",
-    # ---- 5. The top face, which is what a placement height comes from -----
-    # Codex sampled "multiple top pixels" for the pudding's final anchor.
+    # Top face used to estimate placement height.
     "top": "the top surface of the {object}",
-    # ---- 6. What is in the gripper ---------------------------------------
-    # Codex: "sample its visible patterned body ... rejecting any
-    # cavity/background points".
+    # Object currently held by the gripper.
     "held": "the body of the {object} held in the gripper",
-    # ---- 7. Where it ended up --------------------------------------------
-    # Codex re-localizes a released object before deciding to nudge it.
+    # Resting position after release.
     "settled": "the {object} resting on the table",
 }
 
@@ -62,8 +39,7 @@ def build(situation: str, obj: str) -> str:
     return PROMPTS[situation].format(object=obj)
 
 
-#: Which situation applies at each point in a recipe. This is the mapping from
-#: Codex's procedure onto the actions a recipe actually contains.
+#: Localization situation associated with each stage of a recipe.
 SCHEDULE = """
 recipe action                     situation   camera      what it answers
 --------------------------------- ----------- ----------- ---------------------

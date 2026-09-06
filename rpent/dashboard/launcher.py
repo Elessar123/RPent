@@ -31,6 +31,7 @@ def defaults_from_args(args: Any) -> dict[str, Any]:
         "reasoning-effort": args.reasoning_effort,
         "claude-code-max-budget-usd": args.claude_code_max_budget_usd,
         "no-images": args.no_images,
+        "molmo-endpoint": getattr(args, "molmo_endpoint", None),
     }
 
 
@@ -45,6 +46,11 @@ def apply_to_args(args: Any, payload: dict[str, Any]) -> None:
     args.planner_timeout_s = None if timeout in ("", None) else int(timeout)
     args.reasoning_effort = payload.get("reasoning-effort", "none")
     args.no_images = bool(payload.get("no-images", False))
+    args.molmo_endpoint = (
+        payload.get("molmo-endpoint") or None
+        if args.planner == "task_card"
+        else None
+    )
     if args.planner == "claude_code":
         budget = payload.get("claude-code-max-budget-usd")
         args.claude_code_max_budget_usd = (

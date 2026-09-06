@@ -12,7 +12,8 @@ const COPY = {
     pageTitle: "RPent · Live Monitor",
     newSession: "New Session",
     launcherSubtitle: "Review the session config, then start the Dashboard control Session.",
-    planner: "Planner (LLM backend)",
+    planner: "Planner",
+    molmoEndpoint: "Molmo endpoint",
     maxTurns: "Max turns",
     maxEpisodeSteps: "Max episode steps",
     modelPreset: "Model",
@@ -29,7 +30,7 @@ const COPY = {
     defaultPlaceholder: "default",
     startSession: "Start Session",
     liveMonitor: "Live Monitor",
-    runtimeLabels: { env: "ENV", vla: "VLA", sam3: "SAM3" },
+    runtimeLabels: { env: "ENV", vla: "VLA", sam3: "SAM3", molmo: "Molmo" },
     runtimeStates: {
       pending: "waiting",
       starting: "starting",
@@ -133,7 +134,8 @@ const COPY = {
     pageTitle: "RPent · 实时监控",
     newSession: "新建 Session",
     launcherSubtitle: "确认 Session 配置后，启动 Dashboard 控制 Session。",
-    planner: "决策大脑(大模型后端)",
+    planner: "Planner",
+    molmoEndpoint: "Molmo 服务地址",
     maxTurns: "最大对话轮数",
     maxEpisodeSteps: "最大仿真步数",
     modelPreset: "模型",
@@ -150,7 +152,7 @@ const COPY = {
     defaultPlaceholder: "默认",
     startSession: "启动 Session",
     liveMonitor: "实时监控",
-    runtimeLabels: { env: "ENV", vla: "VLA", sam3: "SAM3" },
+    runtimeLabels: { env: "ENV", vla: "VLA", sam3: "SAM3", molmo: "Molmo" },
     runtimeStates: {
       pending: "等待中",
       starting: "启动中",
@@ -368,6 +370,7 @@ const MODEL_PRESETS = {
     "openai:gpt-5.6-luna",
     "openai-chat:glm-5.2",
   ],
+  task_card: [],
 };
 const launcherModelSelections = Object.fromEntries(
   Object.entries(MODEL_PRESETS).map(([planner, models]) => [planner, models[0]]),
@@ -1283,7 +1286,7 @@ setupSplitter($("#composerGrip"), {
 function populateModelPresets(planner, selected = "") {
   const preset = $("#f-model_preset");
   const values = MODEL_PRESETS[planner];
-  const model = selected || values[0];
+  const model = selected || values[0] || "";
   preset.innerHTML = "";
   for (const value of values) {
     const option = document.createElement("option");
@@ -1292,7 +1295,7 @@ function populateModelPresets(planner, selected = "") {
     preset.appendChild(option);
   }
   const selectedPreset = values.includes(model);
-  preset.value = selectedPreset ? model : values[0];
+  preset.value = selectedPreset ? model : (values[0] || "");
   $("#f-model_custom").value = selectedPreset ? "" : model;
 }
 
@@ -1311,6 +1314,7 @@ function showLauncher(defaults) {
   set("#f-reasoning-effort", d["reasoning-effort"] || "none");
   set("#f-claude-code-max-budget-usd", d["claude-code-max-budget-usd"]);
   set("#f-cuda-device", d["cuda-device"]);
+  set("#f-molmo-endpoint", d["molmo-endpoint"]);
   $("#f-no-images").checked = Boolean(d["no-images"]);
   for (const name of Object.keys(launcherModelSelections)) {
     launcherModelSelections[name] = MODEL_PRESETS[name][0];
@@ -1346,6 +1350,9 @@ function collectLaunchConfig() {
     "reasoning-effort": $("#f-reasoning-effort").value,
     "no-images": $("#f-no-images").checked,
     "cuda-device": $("#f-cuda-device").value.trim(),
+    "molmo-endpoint": planner === "task_card"
+      ? $("#f-molmo-endpoint").value.trim()
+      : null,
   };
   if (planner === "claude_code") {
     config["claude-code-max-budget-usd"] = numOrNull("#f-claude-code-max-budget-usd");
@@ -1373,6 +1380,10 @@ async function onRun() {
   ];
   if (config.planner === "api" && !/^[^:]+:.+$/.test(config.model)) {
     $("#launchStatus").textContent = copy.fieldRequired(copy.requiredFields.apiModel);
+    return;
+  }
+  if (config.planner === "task_card" && !config["molmo-endpoint"]) {
+    $("#launchStatus").textContent = copy.fieldRequired("Molmo endpoint");
     return;
   }
   const badNum = requiredNums.find(([_, v]) => v == null || !Number.isFinite(v));

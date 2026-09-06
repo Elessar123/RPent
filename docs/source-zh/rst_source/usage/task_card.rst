@@ -1,80 +1,81 @@
 任务卡模式
 ==========
 
-只记录了绝对路点的方案，无法跟随移动过的物体。而如果同时记录下 *定位了什么*
-以及 *每个路点离那次读数有多远*，就可以：偏移是任务逻辑，换个布局依然成立，
-坐标不是。
+**任务卡（Task Card）** 保存一个 LIBERO 任务的动作序列，并标出这些动作依赖的
+关键物体或位置。重放时，RPent 从相机画面中找到它们在当前场景里的坐标，更新动作
+坐标，然后按顺序执行任务卡中的动作。
 
-**任务卡**就是后一种形式的方案，从一个已解出的 episode 里录制一次。重放时被
-替换的只有感知——动作、动作顺序、给策略的提示词、夹爪指令，全都来自任务卡本身，
-定位器负责给出它们执行时的坐标。
+整个过程可以概括为：
 
-语料
-----
+1. 任务卡决定 **做什么**。
+2. SAM3 或 Molmo 判断在当前场景中 **在哪里做**。
+3. LIBERO toolkit 在更新后的坐标上执行动作。
 
-任务卡放在 ``resources/libero/task_card``，与 ``resources/libero/memory`` 下
-整理好的 memory 并列，和这份 payload 的其余部分一起流转：从 HuggingFace 资源
-数据集同步，或直接读磁盘上已有的副本。和 ``resources/`` 下的所有东西一样，该
-目录不纳入 git。
+因此，``--planner task_card`` 不会调用 LLM 重新规划动作。Molmo 在这里只负责视觉
+定位：它在相机画面中指出指定的物体或位置，RPent 再将该像素转换成当前场景坐标。
 
-一个任务只有一张卡，所以运行时不做任何挑选：任务决定了卡，卡加上实时定位就
-生成轨迹。
+性能与执行时间
+--------------
+
+在 LIBERO Object 的 200 次评测（20 个任务，每个任务 10 个 seed）中，Task Card
+成功完成 179 次（89.5%），不使用 reasoning 的 Codex 成功完成 186 次（93.0%）。
+Task Card 的平均执行时间为每个 episode 40.9 秒，Codex 为 283.6 秒。
+
+.. image:: ../../_static/task_card_object_performance_time.png
+   :alt: Task Card 与不使用 reasoning 的 Codex 在 LIBERO Object 上的逐任务性能和执行时间对比
+   :width: 100%
+   :align: center
+
+时间统计不包含模型及服务启动时间。Codex 时间是每个任务 10 个评测 seed 的 planner
+执行时间均值。Task Card 原始 10-seed 耗时日志已经不可用，因此图中的 Task Card
+耗时采用每张最终任务卡对应录制 episode 的工具执行时间（每个任务一个耗时样本）。
+两种方法的成功率均来自完整的 200-episode 评测。
+
+重放流程
+--------
+
+每张任务卡包含一组动作和一组锚点（anchor）。锚点表示与任务有关的物体或位置，
+例如需要抓取的物体、放置目标等。依赖锚点的动作记录的是相对锚点的偏移，而不只是
+某次场景中的绝对坐标。
+
+运行时，RPent 从任务卡中提取当前计划需要的锚点，并按照卡中记录的方式逐一定位：
+
+* **SAM3** 处理分割类型的锚点，返回物体掩膜及其位置。
+* **Molmo** 处理点定位类型的锚点，在相机画面中指出目标物体或位置。
+
+RPent 将实时锚点位置与任务卡保存的偏移组合成新的路点，再执行对应动作。因此，
+即使物体在新布局中换了位置，同一张任务卡仍能使用当前场景的坐标执行。
+
+任务卡文件
+----------
+
+任务卡不随 Git 仓库提交，而是通过 Hugging Face 上的 `RLinf/RPent-memory 任务卡目录
+<https://huggingface.co/datasets/RLinf/RPent-memory/tree/main/libero/task_card>`_
+分发。RPent 会随其他 LIBERO 资源自动下载任务卡，并保存到本地
+``resources/libero/task_card``。每个受支持的任务对应一张任务卡。
 
 .. code-block:: text
 
    resources/libero/task_card/
-     index.json                 全部卡片：任务、来源 episode、任务指令
+     index.json                 任务卡索引
      object/swap_t3/
-       anchors.json             定位过的短语、各自的读数，以及由此得到的锚点
-       plan.json                每个动作，标出其坐标背后的锚点与偏移
-       trace.md                 已记录动作的可读执行轨迹
+       anchors.json             运行时需要定位的物体和位置
+       plan.json                动作及其相对锚点的坐标
+       trace.md                 便于阅读的动作轨迹
 
-语料里不出现 seed。一张卡无论重放到哪个布局上都服务于它那个任务；它从哪个
-episode 录来，作为溯源信息保存在卡内部的 ``source`` 字段里，而不是一个可调项。
+任务决定使用哪张卡；seed 只改变环境布局，不改变该任务使用的任务卡。
 
-Molmo 配置
+如果只想手动下载任务卡，可以运行：
+
+.. code-block:: bash
+
+   hf download RLinf/RPent-memory --repo-type dataset \
+     --include "libero/task_card/**" --local-dir resources
+
+运行任务卡
 ----------
 
-重放用 **Molmo** 定位点类型锚点，由
-``rpent/robots/components/molmo_server.py`` 提供服务。SAM3 回答的是"哪些像素
-是这个短语"，Molmo 回答的是"你会把夹爪放在哪里"——一个开放词表的点，面向那些
-掩膜候选叫不出名字的短语。
-
-Molmo 装在自己的独立环境里，与 LIBERO 环境分开。新建该环境、装上 ``molmo``
-extra，然后从
-`Hugging Face: allenai/Molmo2-8B <https://huggingface.co/allenai/Molmo2-8B>`_
-或 `ModelScope: allenai/Molmo2-8B
-<https://modelscope.cn/models/allenai/Molmo2-8B>`_ 下载权重，并通过
-``MOLMO_CHECKPOINT_PATH`` 指向它：
-
-.. code-block:: bash
-
-   uv venv --python 3.11 /path/to/molmo-venv
-   /path/to/molmo-venv/bin/pip install -e ".[molmo]"
-
-   # Hugging Face
-   hf download allenai/Molmo2-8B --local-dir /path/to/Molmo2-8B
-
-   # ModelScope（用它替代上面的 Hugging Face 命令）
-   modelscope download --model allenai/Molmo2-8B --local_dir /path/to/Molmo2-8B
-
-   export MOLMO_CHECKPOINT_PATH=/path/to/Molmo2-8B
-
-用该环境的解释器启动服务：
-
-.. code-block:: bash
-
-   PYTHONPATH=/path/to/RPent /path/to/molmo-venv/bin/python \
-     rpent/robots/components/molmo_server.py \
-     --transport http --host 127.0.0.1 --port 20703
-
-下面两个入口都是连接该服务的地址，而不是自己去启动它。
-
-重放单个 episode
-----------------
-
-``--planner task_card`` 和 ``api``、``codex`` 一样是一个 planner 后端，只是由
-任务卡决定动作，不调用任何模型。运行的其余部分完全不变：
+先启动 Molmo 服务，再把服务地址传给 RPent：
 
 .. code-block:: bash
 
@@ -82,14 +83,39 @@ extra，然后从
      --suite libero_object_swap --task 3 --seed 0 \
      --molmo-endpoint http://127.0.0.1:20703
 
-语料里每个任务只有一张卡，所以 seed 选的是要解决的布局，而不是用来解决它的
-方案。
+任务卡重放目前支持 ``libero_object_task`` 和 ``libero_object_swap``。其他
+LIBERO suite 暂时还没有对应的任务卡。
 
-重放整轮扫描
+VLA 和 SAM3 沿用普通 LIBERO 运行方式。也可以通过 ``--vla-endpoint`` 和
+``--sam3-endpoint`` 连接已经启动的服务。
+
+Molmo 配置
+----------
+
+Molmo 需要的 ``transformers`` 版本比 LIBERO 策略环境更新，因此应在独立 Python
+环境中运行：
+
+.. code-block:: bash
+
+   uv venv --python 3.11 /path/to/molmo-venv
+   /path/to/molmo-venv/bin/pip install -e ".[molmo]"
+
+从 `Hugging Face <https://huggingface.co/allenai/Molmo2-8B>`_ 或
+`ModelScope <https://modelscope.cn/models/allenai/Molmo2-8B>`_ 下载
+``allenai/Molmo2-8B``，然后启动服务：
+
+.. code-block:: bash
+
+   export MOLMO_CHECKPOINT_PATH=/path/to/Molmo2-8B
+   PYTHONPATH=/path/to/RPent /path/to/molmo-venv/bin/python \
+     rpent/robots/components/molmo_server.py \
+     --transport http --host 127.0.0.1 --port 20703
+
+重放多个布局
 ------------
 
-整轮扫描就是同一条命令跑更多 cell。把各个端点都指向已经在提供服务的模型，
-这样一整轮只加载一次：
+使用不同 seed 运行同一任务卡，即可在不同布局上执行。复用已经启动的 VLA、SAM3
+和 Molmo 服务，可以避免每次运行都重新加载模型：
 
 .. code-block:: bash
 
@@ -101,30 +127,3 @@ extra，然后从
        --sam3-endpoint http://127.0.0.1:20702 \
        --molmo-endpoint http://127.0.0.1:20703
    done
-
-   # 数一下解出了几个
-   grep -l '"status": "success"' logs/sweep/*/transcript_*.json | wc -l
-
-评测是单次尝试且不重置环境：失败的 episode 记为失败，不会从干净状态重来。
-
-读数如何变成路点
-----------------
-
-每个锚点都 **用它最初被读取的那个接口** 重新读取。``segment`` 来源的锚点重新
-分割，因为它的偏移是相对掩膜质心算的，而斜视角下的宽口容器，其质心离指点模型
-所指的位置有相当距离。点定位锚点则交给定位器回答。
-
-定位分两级：先对开局画面粗看全场，然后机械臂停到每个点定位锚点上方，用腕部
-相机再问一次——此时物体填满视野。近距读数只在与粗读数相差 5 厘米以内时才采纳，
-这样腕部视野里认错的东西不会覆盖掉正确答案。
-
-对 *被握持* 物体的腕部读数会落在其中心之前，物体越高偏得越远。该修正与物体
-高度成线性关系。
-
-配置项
-------
-
-除了常规的 LIBERO 运行参数之外没有别的东西要配。``--suite`` / ``--task`` /
-``--seed`` 指定 cell，卡由任务本身决定。唯一新增的是 ``--molmo-endpoint``：
-指向一个已在提供服务的定位器。Molmo 的 ``transformers`` 依赖与策略环境冲突，
-因此它需要运行在独立环境中，RPent 不会用当前 Python 解释器代为启动。

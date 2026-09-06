@@ -64,6 +64,14 @@ PARALLAX = {"x": (0.0231, 0.0610), "y": (-0.0029, 0.2056)}
 #: How many times a pick that did not take hold is retried by replaying its
 #: approach. No reset is involved; the episode continues.
 PICK_ATTEMPTS = 3
+#: Preserve the task-card replay's established grasp acceptance thresholds,
+#: while leaving ``pi0_pick`` as the single owner of the success decision.
+TASK_CARD_PICK_THRESHOLDS = {
+    "lift_thresh": 0.04,
+    "gripper_closed_thresh": 0.07,
+    "gripper_open_thresh": 0.003,
+    "descent_thresh": 0.0,
+}
 
 
 def profile(
@@ -189,6 +197,11 @@ def action_result(raw):
     return raw
 
 
+def pick_succeeded(raw) -> bool:
+    """Return the success decision made by ``pi0_pick`` itself."""
+    return action_result(raw).get("success") is True
+
+
 def execute(toolkit: Any, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """Execute one toolkit action and turn its error result into an exception."""
     result = toolkit.execute_tool(name, arguments).result
@@ -197,30 +210,6 @@ def execute(toolkit: Any, name: str, arguments: dict[str, Any]) -> dict[str, Any
     if error := result.get("error"):
         raise RuntimeError(f"{name} failed: {error}")
     return result
-
-
-def pick_confirmed(raw) -> bool:
-    """Did the pick take hold?
-
-    The policy's own flag is a heuristic over its rollout, so a closed jaw that
-    lifted counts too. Either is enough; neither is a failed pick, and that is
-    what the guards key off.
-    """
-    result = action_result(raw)
-    if str(result.get("success", "")).strip().lower() in {"true", "1", "yes"}:
-        return True
-    if (
-        str((result.get("grasp_continuity") or {}).get("state", ""))
-        == "GRASP_CONFIRMED"
-    ):
-        return True
-    opening = result.get("final_gripper_opening")
-    if opening is None:
-        qpos = (result.get("state") or {}).get("robot0_gripper_qpos") or []
-        if len(qpos) >= 2:
-            opening = abs(float(qpos[0])) + abs(float(qpos[1]))
-    lift = float(result.get("peak_lift_m", 0.0) or 0.0)
-    return bool(opening is not None and 0.003 <= float(opening) < 0.07 and lift >= 0.04)
 
 
 def cards(root: Path | None = None) -> Path:
@@ -238,9 +227,10 @@ def cards(root: Path | None = None) -> Path:
 
         ensure_resources(get_robot_spec("libero"))
     if not (root / "index.json").is_file():
-        raise SystemExit(
-            f"no task cards under {root}; sync them with the rest of the "
-            "LIBERO resources, or point --cards at a corpus."
+        raise FileNotFoundError(
+            f"no task cards found under {root}; download "
+            "'libero/task_card/**' from the RLinf/RPent-memory "
+            "Hugging Face dataset into resources/"
         )
     return root
 
@@ -425,9 +415,11 @@ def replay(
                 held_phrase = re.split(r"\b(on|in|into|inside|by|and)\b", stripped)[
                     0
                 ].strip()
+                if name == "pi0_pick":
+                    arguments.update(TASK_CARD_PICK_THRESHOLDS)
                 raw = execute(toolkit, name, arguments)
                 look()
-                if name == "pi0_pick" and not pick_confirmed(raw):
+                if name == "pi0_pick" and not pick_succeeded(raw):
                     for _ in range(PICK_ATTEMPTS - 1):
                         if finished():
                             break
@@ -435,9 +427,9 @@ def replay(
                             execute(toolkit, again, dict(again_args))
                         raw = execute(toolkit, name, dict(arguments))
                         look()
-                        if pick_confirmed(raw):
+                        if pick_succeeded(raw):
                             break
-                    if not pick_confirmed(raw):
+                    if not pick_succeeded(raw):
                         note("      pick unconfirmed, skipping its carry")
                         skip_suffix = True
             elif name == "set_gripper":
@@ -466,7 +458,7 @@ def replay(
         if name in {"release", "pi0_pick", "pi0_doubled"}:
             recent.clear()
         elif name in {"move_to", "move_pose", "set_gripper", "rotate_wrist"}:
-            recent.append((name, dict(entry["arguments"])))
+            recent.append((name, dict(arguments)))
             recent = recent[-6:]
 
     return {"done": finished(), "anchors": len(live), "plan": len(plan)}

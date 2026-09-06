@@ -28,9 +28,7 @@ the cell and reports what came back.
 from __future__ import annotations
 
 import time
-from pathlib import Path
 
-from rpent.dashboard.events import DashboardEventSink
 from rpent.planner.base import PlannerResult
 from rpent.robots.base import get_robot_spec
 from rpent.tools.toolkit import Toolkit
@@ -47,14 +45,10 @@ class TaskCardPlanner:
         *,
         recipe_tag: str,
         robot_name: str,
-        output_dir: str | Path,
-        dashboard_events: DashboardEventSink,
     ) -> None:
         """Note which cell this replays; the robot resolves it to a card."""
         self._recipe_tag = recipe_tag
         self._robot_name = robot_name
-        self._output_dir = Path(output_dir)
-        self._dashboard_events = dashboard_events
 
     def solve(
         self,

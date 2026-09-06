@@ -72,7 +72,7 @@ class PlannerResult:
 
 
 class Planner(Protocol):
-    """A planner solves a task by conversing with an LLM/VLM backend.
+    """A planner selects or supplies the actions used to solve a task.
 
     It is given one system prompt, one initial user message, and a set of
     tool definitions.  It returns a ``PlannerResult`` after the task is
@@ -224,7 +224,5 @@ def build_planner(
         return TaskCardPlanner(
             recipe_tag=recipe_tag,
             robot_name=robot_name,
-            output_dir=output_dir,
-            dashboard_events=dashboard_events,
         )
     raise ValueError(f"unknown planner_type: {planner_type}")

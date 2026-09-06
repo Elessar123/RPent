@@ -1,84 +1,94 @@
 Task Cards
 ==========
 
-A plan recorded as absolute waypoints cannot follow an object that moved. The
-same plan recorded together with *what was localized* and *how far each
-waypoint sat from that reading* can: the offset is task logic and survives a
-change of layout, the coordinate is not.
+A **task card** stores the action sequence for a LIBERO task and marks the key
+objects or locations needed by those actions. During replay, RPent finds their
+current coordinates in the camera images, updates the action coordinates, and
+executes the recorded actions in order.
 
-A **task card** is a plan in that second form, recorded once from a solved
-episode. Replaying it substitutes only perception: the actions, their order,
-the prompts given to the policy and the gripper commands are all the card's,
-and the grounder supplies the coordinates they run at.
+This keeps planning and perception separate:
 
-The corpus
-----------
+1. The task card decides **what to do**.
+2. SAM3 or Molmo finds **where to do it** in the current scene.
+3. The LIBERO toolkit executes the actions at the updated coordinates.
 
-Cards live in ``resources/libero/task_card``, beside the curated memory under
-``resources/libero/memory``, and travel with the rest of that payload -- synced
-from the HuggingFace resources dataset, or read from a copy already on disk.
-Like everything under ``resources/``, the directory is not tracked in git.
+``--planner task_card`` therefore does not call an LLM to make planning
+decisions. Molmo is used only for visual localization: it points to a requested
+object or location in a camera image so RPent can recover its current
+coordinates.
 
-There is one card per task, so nothing is chosen at run time: the task names
-the card, and the card plus live grounding produces the trajectory.
+Performance and execution time
+------------------------------
+
+On the 200 LIBERO Object evaluations (20 tasks and 10 seeds per task), Task
+Card solved 179 episodes (89.5%), compared with 186 (93.0%) for Codex without
+reasoning. Its mean execution time was 40.9 seconds per episode, compared with
+283.6 seconds for Codex.
+
+.. image:: ../../_static/task_card_object_performance_time.png
+   :alt: Per-task performance and execution-time comparison between Task Card and Codex without reasoning on LIBERO Object
+   :width: 100%
+   :align: center
+
+The timing excludes model and service startup. Codex time is the mean planner
+execution time over the 10 evaluated seeds for each task. The original
+10-seed Task Card timing logs are no longer available, so its timing bars use
+the tool-execution time from the recorded episode underlying each final card
+(one timing sample per task). The success rates use the complete 200-episode
+evaluation in both cases.
+
+How replay works
+----------------
+
+Each card contains an action plan and a set of anchors. An anchor describes a
+task-relevant object or location, such as the object to pick or the destination
+for a placement. Actions that depend on an anchor store their offset from that
+anchor instead of relying only on an absolute coordinate.
+
+At run time, RPent extracts the anchors required by the card and locates each
+one with the interface recorded for it:
+
+* **SAM3** locates segmentation anchors and returns an object mask and its
+  position.
+* **Molmo** locates point anchors by pointing to the requested object or
+  location in the camera image.
+
+RPent then combines each live anchor position with the offset stored in the
+card and executes the resulting waypoint. This lets the same card run when
+objects appear at different positions.
+
+Task-card files
+---------------
+
+Task cards are distributed through the `RLinf/RPent-memory task-card directory
+<https://huggingface.co/datasets/RLinf/RPent-memory/tree/main/libero/task_card>`_
+on Hugging Face rather than tracked in Git. RPent downloads them with the other
+LIBERO resources and stores them locally under ``resources/libero/task_card``.
+There is one card for each supported task.
 
 .. code-block:: text
 
    resources/libero/task_card/
-     index.json                 every card: task, source episode, instruction
+     index.json                 task-card index
      object/swap_t3/
-       anchors.json             phrases localized, their readings, the anchor each yields
-       plan.json                every action, with the anchor and offset behind its coordinate
-       trace.md                 a human-readable trace of the recorded actions
+       anchors.json             objects and locations to locate at run time
+       plan.json                actions and their anchor-relative coordinates
+       trace.md                 human-readable action trace
 
-No seed appears in the corpus. A card serves its task whatever layout it is
-replayed against; the episode it was recorded from is kept inside the card as
-``source``, as provenance rather than as a knob.
+The task selects the card. The seed changes the environment layout, not the
+card used for the task.
 
-Molmo configuration
--------------------
-
-Replay grounds point-based anchors with **Molmo**, served by
-``rpent/robots/components/molmo_server.py``. Where SAM3 answers "which pixels
-are this phrase", Molmo answers "where would you put the gripper" -- an
-open-vocabulary point, for phrases no mask proposal names.
-
-Molmo installs into its own environment, separate from the LIBERO one. Create
-it, install the ``molmo`` extra, then download the weights from
-`Hugging Face: allenai/Molmo2-8B <https://huggingface.co/allenai/Molmo2-8B>`_
-or `ModelScope: allenai/Molmo2-8B
-<https://modelscope.cn/models/allenai/Molmo2-8B>`_ and point at them via
-``MOLMO_CHECKPOINT_PATH``:
+To download only the task cards manually, run:
 
 .. code-block:: bash
 
-   uv venv --python 3.11 /path/to/molmo-venv
-   /path/to/molmo-venv/bin/pip install -e ".[molmo]"
+   hf download RLinf/RPent-memory --repo-type dataset \
+     --include "libero/task_card/**" --local-dir resources
 
-   # Hugging Face
-   hf download allenai/Molmo2-8B --local-dir /path/to/Molmo2-8B
+Run a task card
+---------------
 
-   # ModelScope (use this instead of the Hugging Face command above)
-   modelscope download --model allenai/Molmo2-8B --local_dir /path/to/Molmo2-8B
-
-   export MOLMO_CHECKPOINT_PATH=/path/to/Molmo2-8B
-
-Serve it with that interpreter:
-
-.. code-block:: bash
-
-   PYTHONPATH=/path/to/RPent /path/to/molmo-venv/bin/python \
-     rpent/robots/components/molmo_server.py \
-     --transport http --host 127.0.0.1 --port 20703
-
-Both entry points below take the server's address rather than starting it.
-
-Replaying one episode
----------------------
-
-``--planner task_card`` is a planner backend like ``api`` or ``codex``, except
-that the card decides the actions and no model is called. Everything else about
-the run is unchanged:
+Start Molmo first, then pass its endpoint to RPent:
 
 .. code-block:: bash
 
@@ -86,14 +96,41 @@ the run is unchanged:
      --suite libero_object_swap --task 3 --seed 0 \
      --molmo-endpoint http://127.0.0.1:20703
 
-The corpus holds one card per task, so the seed selects the layout to solve,
-never the plan used to solve it.
+Task-card replay currently supports the ``libero_object_task`` and
+``libero_object_swap`` suites. Other LIBERO suites do not yet have task cards.
 
-Replaying a whole sweep
+The VLA and SAM3 services use the normal LIBERO runtime configuration. You can
+also connect to services that are already running with ``--vla-endpoint`` and
+``--sam3-endpoint``.
+
+Molmo setup
+-----------
+
+Molmo requires a newer ``transformers`` version than the LIBERO policy
+environment, so run it in a separate Python environment:
+
+.. code-block:: bash
+
+   uv venv --python 3.11 /path/to/molmo-venv
+   /path/to/molmo-venv/bin/pip install -e ".[molmo]"
+
+Download ``allenai/Molmo2-8B`` from `Hugging Face
+<https://huggingface.co/allenai/Molmo2-8B>`_ or `ModelScope
+<https://modelscope.cn/models/allenai/Molmo2-8B>`_, then start the service:
+
+.. code-block:: bash
+
+   export MOLMO_CHECKPOINT_PATH=/path/to/Molmo2-8B
+   PYTHONPATH=/path/to/RPent /path/to/molmo-venv/bin/python \
+     rpent/robots/components/molmo_server.py \
+     --transport http --host 127.0.0.1 --port 20703
+
+Replay multiple layouts
 -----------------------
 
-A sweep is that same command over more cells. Point every endpoint at a
-already-serving model so the sweep pays to load them once:
+Run the same task card with different seeds to evaluate it on different
+layouts. Reusing existing VLA, SAM3, and Molmo services avoids loading the
+models again for every run:
 
 .. code-block:: bash
 
@@ -105,37 +142,3 @@ already-serving model so the sweep pays to load them once:
        --sam3-endpoint http://127.0.0.1:20702 \
        --molmo-endpoint http://127.0.0.1:20703
    done
-
-   # how many solved
-   grep -l '"status": "success"' logs/sweep/*/transcript_*.json | wc -l
-
-Evaluation is single-attempt with no environment reset: a failed episode is
-scored as failed, not retried from a clean state.
-
-How a reading becomes a waypoint
---------------------------------
-
-Each anchor is re-read **through the interface it was first read through**. A
-``segment`` anchor is re-segmented, because its offsets are relative to a mask
-centroid, and a wide container seen at an angle has that centroid some way from
-where a pointing model points. Point-grounded anchors are answered by the
-grounder.
-
-Localization is two-stage: a coarse survey of the opening frame, then the arm
-parks over each point-grounded anchor and asks again from the wrist, where the
-object fills the view. The close reading is kept only when it agrees with the
-coarse one within 5 cm, so a wrist view that found something else cannot
-overwrite a correct answer.
-
-A wrist reading of a *held* object lands short of its centre, further the
-taller the object. The correction is linear in the object's measured height.
-
-Configuration
--------------
-
-There is nothing to configure beyond the usual LIBERO run. ``--suite`` /
-``--task`` / ``--seed`` name the cell, and the card follows from the task.
-The one required addition is ``--molmo-endpoint``: an already-serving
-grounder. Molmo runs in a separate environment because its ``transformers``
-requirement conflicts with the policy environment, so RPent does not start it
-with the current Python interpreter.

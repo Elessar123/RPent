@@ -58,6 +58,13 @@ LIBERO_SUITE_NAMES = (
     "libero_10_lan",
 )
 
+TASK_CARD_SUITES = frozenset(
+    {
+        "libero_object_task",
+        "libero_object_swap",
+    }
+)
+
 LIBERO_DASHBOARD_SPEC = {
     "task": {
         "command": "/rpent-task",
@@ -235,8 +242,18 @@ def _parse_config(args: argparse.Namespace) -> RunConfig:
         raise ValueError("--suite is required")
     if args.task is None:
         raise ValueError("--task is required")
-    if getattr(args, "planner", None) == "task_card" and args.molmo_endpoint is None:
-        raise ValueError("--planner task_card requires --molmo-endpoint")
+    planner = getattr(args, "planner", None)
+    if planner == "task_card":
+        if args.suite not in TASK_CARD_SUITES:
+            supported = ", ".join(sorted(TASK_CARD_SUITES))
+            raise ValueError(
+                f"--planner task_card does not support --suite {args.suite!r}; "
+                f"supported suites: {supported}"
+            )
+        if args.molmo_endpoint is None:
+            raise ValueError("--planner task_card requires --molmo-endpoint")
+    elif args.molmo_endpoint is not None:
+        raise ValueError("--molmo-endpoint requires --planner task_card")
 
     recipe_tag = f"{args.suite.replace('libero_', '')}_t{args.task}_s{args.seed}"
     explore = bool(getattr(args, "explore", False))

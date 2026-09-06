@@ -13,11 +13,12 @@
       <div class="sub" data-i18n="launcherSubtitle">Review the session config, then start the Dashboard control Session.</div>
       <div class="lform">
         <div class="lfield full">
-          <label for="f-planner" data-i18n="planner">Planner (LLM backend)</label>
+          <label for="f-planner" data-i18n="planner">Planner</label>
           <select id="f-planner">
             <option value="claude_code" selected>claude_code</option>
             <option value="codex">codex</option>
             <option value="api">api</option>
+            <option value="task_card">task_card</option>
           </select>
         </div>
         <div class="lfield">
@@ -39,6 +40,10 @@
         <div class="lfield full lcheck" data-planner="api">
           <input type="checkbox" id="f-no-images" />
           <label for="f-no-images" data-i18n="noImages">Disable image input (required for text-only models)</label>
+        </div>
+        <div class="lfield full" data-planner="task_card">
+          <label for="f-molmo-endpoint" data-i18n="molmoEndpoint">Molmo endpoint</label>
+          <input type="text" id="f-molmo-endpoint" placeholder="http://127.0.0.1:20703" />
         </div>
         <div class="lfield" data-planner="claude_code">
           <label for="f-claude-code-max-budget-usd" data-i18n="claudeBudget">Claude Code budget USD</label>

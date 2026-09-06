@@ -97,7 +97,7 @@ class MolmoEngine:
         except ImportError as exc:
             raise RuntimeError(
                 "local Molmo dependencies are missing; install RPent with "
-                '`pip install -e ".[full]"`'
+                '`pip install -e ".[molmo]"`'
             ) from exc
 
         if not torch.cuda.is_available():

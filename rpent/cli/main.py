@@ -352,7 +352,11 @@ def main() -> int:
     logger.info("physical agent cmd: %s", shlex.join([sys.executable, *sys.argv]))
 
     memory_profile = getattr(args, "memory_profile", "hf")
-    if not getattr(args, "explore", False) and memory_profile == "hf":
+    if (
+        not getattr(args, "explore", False)
+        and memory_profile == "hf"
+        and args.planner != "task_card"
+    ):
         MemoryManager(get_memory_dir(robot_name)).sync(
             remote_repo=robot_spec.memory_repo_id,
         )

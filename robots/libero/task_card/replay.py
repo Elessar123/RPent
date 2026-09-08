@@ -212,13 +212,7 @@ def execute(toolkit: Any, name: str, arguments: dict[str, Any]) -> dict[str, Any
 
 
 def cards(root: Path | None = None) -> Path:
-    """The task-card corpus, synced the way every other resource is.
-
-    Cards live under ``resources/libero/`` beside the curated memory, so they
-    arrive either from the HuggingFace dataset or from a copy already on disk.
-    A run that has neither is told where to download the cards instead of
-    failing later while opening a task file.
-    """
+    """Return the local task-card corpus, downloading only task-card files."""
     root = root or CARDS
     if not any(root.glob("*_plan.json")):
         from rpent.memory import MemoryManager
@@ -227,6 +221,7 @@ def cards(root: Path | None = None) -> Path:
         robot_spec = get_robot_spec("libero")
         MemoryManager(get_memory_dir("libero")).sync(
             remote_repo=robot_spec.memory_repo_id,
+            allow_patterns=("libero/task_card/**",),
         )
     if not any(root.glob("*_plan.json")):
         raise FileNotFoundError(

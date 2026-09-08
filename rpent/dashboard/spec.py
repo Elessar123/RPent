@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, NotRequired, TypedDict
+from typing import Literal, TypedDict
 
 
 class TaskFieldSpecRequired(TypedDict):
@@ -38,11 +38,14 @@ class TaskSpec(TypedDict):
     output_slug: str
 
 
-class RuntimeComponentSpec(TypedDict):
+class RuntimeComponentSpecRequired(TypedDict):
     name: str
     label: str
     scope: Literal["shared", "unique"]
-    planners: NotRequired[tuple[str, ...]]
+
+
+class RuntimeComponentSpec(RuntimeComponentSpecRequired, total=False):
+    planners: tuple[str, ...]
 
 
 class FrameChannelSpec(TypedDict):

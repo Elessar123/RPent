@@ -19,7 +19,7 @@ from types import SimpleNamespace
 import pytest
 
 from robots.libero.robot_spec import _parse_config
-from robots.libero.task_card.replay import cards, execute, pick_succeeded, replay
+from robots.libero.task_card.replay import cards, execute, load, pick_succeeded, replay
 
 
 class _Toolkit:
@@ -68,7 +68,7 @@ def test_replay_reuses_toolkit_opening_observation() -> None:
     result = replay(
         toolkit,
         molmo=SimpleNamespace(),
-        card={"plan": [], "reference": {}, "source_of": {}},
+        card={"plan": [], "reference": {}, "locator_of": {}},
     )
 
     assert result == {"done": False, "anchors": 0, "plan": 0}
@@ -91,7 +91,7 @@ def test_replay_passes_legacy_pick_thresholds_to_pi0_pick() -> None:
                 }
             ],
             "reference": {},
-            "source_of": {},
+            "locator_of": {},
         },
     )
 
@@ -137,7 +137,7 @@ def test_pick_retry_reuses_relocated_move_arguments() -> None:
                 {"action": "pi0_pick", "arguments": {"prompt": "pick up the bowl"}},
             ],
             "reference": {"bowl": [0.0, 0.0]},
-            "source_of": {"bowl": "segment"},
+            "locator_of": {"bowl": "segment"},
         },
     )
 
@@ -177,3 +177,25 @@ def test_missing_cards_explains_where_to_download(monkeypatch, tmp_path) -> None
         cards(tmp_path / "task_card")
 
     assert "--cards" not in str(error.value)
+
+
+def test_cards_do_not_require_an_index(tmp_path) -> None:
+    root = tmp_path / "task_card"
+    root.mkdir(parents=True)
+    (root / "object_swap_t0_plan.json").write_text('{"plan": []}')
+
+    assert cards(root) == root
+
+
+def test_load_reads_only_runtime_card_fields(tmp_path) -> None:
+    (tmp_path / "object_swap_t0_plan.json").write_text('{"plan": []}')
+    (tmp_path / "object_swap_t0_anchors.json").write_text(
+        '{"anchors": [{"phrase": "bowl", "locator": "segment", '
+        '"median_xy": [0.1, 0.2]}]}'
+    )
+
+    card = load(tmp_path, "object_swap_t0")
+
+    assert card["plan"] == []
+    assert card["reference"]["bowl"].tolist() == [0.1, 0.2]
+    assert card["locator_of"] == {"bowl": "segment"}

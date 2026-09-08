@@ -217,16 +217,16 @@ def cards(root: Path | None = None) -> Path:
 
     Cards live under ``resources/libero/`` beside the curated memory, so they
     arrive either from the HuggingFace dataset or from a copy already on disk.
-    A run that has neither is told which, rather than failing later on a
-    missing index.
+    A run that has neither is told where to download the cards instead of
+    failing later while opening a task file.
     """
     root = root or CARDS
-    if not (root / "index.json").is_file():
+    if not any(root.glob("*_plan.json")):
         from rpent.robots.base import get_robot_spec
         from rpent.utils.resources import ensure_resources
 
         ensure_resources(get_robot_spec("libero"))
-    if not (root / "index.json").is_file():
+    if not any(root.glob("*_plan.json")):
         raise FileNotFoundError(
             f"no task cards found under {root}; download "
             "'libero/task_card/**' from the RLinf/RPent-memory "
@@ -235,14 +235,14 @@ def cards(root: Path | None = None) -> Path:
     return root
 
 
-def load(folder: Path) -> dict:
+def load(root: Path, card_name: str) -> dict:
     """Read one card: its plan, and the anchors its coordinates were written against."""
-    plan = json.loads((folder / "plan.json").read_text())["plan"]
-    anchors = json.loads((folder / "anchors.json").read_text())["anchors"]
+    plan = json.loads((root / f"{card_name}_plan.json").read_text())["plan"]
+    anchors = json.loads((root / f"{card_name}_anchors.json").read_text())["anchors"]
     return {
         "plan": plan,
         "reference": {a["phrase"]: np.array(a["median_xy"]) for a in anchors},
-        "source_of": {a["phrase"]: a["source"] for a in anchors},
+        "locator_of": {a["phrase"]: a["locator"] for a in anchors},
     }
 
 
@@ -260,7 +260,7 @@ def replay(
     """
     plan = card["plan"]
     reference = card["reference"]
-    source_of = card["source_of"]
+    locator_of = card["locator_of"]
 
     state = toolkit.state
 
@@ -284,7 +284,7 @@ def replay(
 
     live: dict[str, np.ndarray] = {}
     for phrase in reference:
-        if source_of.get(phrase) == "segment":
+        if locator_of.get(phrase) == "segment":
             # One phrase the segmenter cannot place must not end the episode:
             # the rest of the anchors, and the actions that hang off them,
             # are still worth running.
@@ -335,7 +335,7 @@ def replay(
         default=0.72,
     )
     for phrase in list(live):
-        if source_of.get(phrase) == "segment":
+        if locator_of.get(phrase) == "segment":
             continue
         coarse = live[phrase]
         try:
@@ -482,8 +482,9 @@ def replay_card(
     # The seed selects the layout to solve, not the plan used to solve it.
     family, suite, task, _ = match.groups()
     key = f"{suite}_t{task}"
-    folder = cards() / family / key
-    if not (folder / "plan.json").is_file():
+    root = cards()
+    card_name = f"{family}_{key}"
+    if not (root / f"{card_name}_plan.json").is_file():
         raise FileNotFoundError(f"no task card for {family}/{key} under {CARDS}")
 
     molmo = toolkit.primitives.molmo_client
@@ -492,4 +493,7 @@ def replay_card(
             "no grounder: task cards need a Molmo server named by --molmo-endpoint"
         )
     note(f"replaying the {family}/{key} card")
-    return {**replay(toolkit, molmo, load(folder), note), "card": f"{family}/{key}"}
+    return {
+        **replay(toolkit, molmo, load(root, card_name), note),
+        "card": f"{family}/{key}",
+    }

@@ -69,11 +69,8 @@ There is one card for each supported task.
 .. code-block:: text
 
    resources/libero/task_card/
-     index.json                 task-card index
-     object/swap_t3/
-       anchors.json             objects and locations to locate at run time
-       plan.json                actions and their anchor-relative coordinates
-       trace.md                 human-readable action trace
+     object_swap_t3_anchors.json   objects and locations to locate at run time
+     object_swap_t3_plan.json      actions and their anchor-relative coordinates
 
 The task selects the card. The seed changes the environment layout, not the
 card used for the task.

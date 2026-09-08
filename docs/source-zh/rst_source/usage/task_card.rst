@@ -57,11 +57,8 @@ RPent 将实时锚点位置与任务卡保存的偏移组合成新的路点，�
 .. code-block:: text
 
    resources/libero/task_card/
-     index.json                 任务卡索引
-     object/swap_t3/
-       anchors.json             运行时需要定位的物体和位置
-       plan.json                动作及其相对锚点的坐标
-       trace.md                 便于阅读的动作轨迹
+     object_swap_t3_anchors.json   运行时需要定位的物体和位置
+     object_swap_t3_plan.json      动作及其相对锚点的坐标
 
 任务决定使用哪张卡；seed 只改变环境布局，不改变该任务使用的任务卡。
 

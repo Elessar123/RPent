@@ -63,12 +63,12 @@ Task-card files
 Task cards are distributed through the `RLinf/RPent-memory task-card directory
 <https://huggingface.co/datasets/RLinf/RPent-memory/tree/main/libero/task_card>`_
 on Hugging Face rather than tracked in Git. RPent downloads them with the other
-LIBERO resources and stores them locally under ``resources/libero/task_card``.
+LIBERO memory and stores them locally under ``memory/libero/task_card``.
 There is one card for each supported task.
 
 .. code-block:: text
 
-   resources/libero/task_card/
+   memory/libero/task_card/
      object_swap_t3_anchors.json   objects and locations to locate at run time
      object_swap_t3_plan.json      actions and their anchor-relative coordinates
 
@@ -80,7 +80,7 @@ To download only the task cards manually, run:
 .. code-block:: bash
 
    hf download RLinf/RPent-memory --repo-type dataset \
-     --include "libero/task_card/**" --local-dir resources
+     --include "libero/task_card/**" --local-dir memory
 
 Run a task card
 ---------------

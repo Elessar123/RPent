@@ -51,12 +51,12 @@ RPent 将实时锚点位置与任务卡保存的偏移组合成新的路点，�
 
 任务卡不随 Git 仓库提交，而是通过 Hugging Face 上的 `RLinf/RPent-memory 任务卡目录
 <https://huggingface.co/datasets/RLinf/RPent-memory/tree/main/libero/task_card>`_
-分发。RPent 会随其他 LIBERO 资源自动下载任务卡，并保存到本地
-``resources/libero/task_card``。每个受支持的任务对应一张任务卡。
+分发。RPent 会随其他 LIBERO memory 自动下载任务卡，并保存到本地
+``memory/libero/task_card``。每个受支持的任务对应一张任务卡。
 
 .. code-block:: text
 
-   resources/libero/task_card/
+   memory/libero/task_card/
      object_swap_t3_anchors.json   运行时需要定位的物体和位置
      object_swap_t3_plan.json      动作及其相对锚点的坐标
 
@@ -67,7 +67,7 @@ RPent 将实时锚点位置与任务卡保存的偏移组合成新的路点，�
 .. code-block:: bash
 
    hf download RLinf/RPent-memory --repo-type dataset \
-     --include "libero/task_card/**" --local-dir resources
+     --include "libero/task_card/**" --local-dir memory
 
 运行任务卡
 ----------

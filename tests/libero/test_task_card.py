@@ -171,7 +171,7 @@ def test_non_task_card_planner_rejects_molmo_endpoint() -> None:
 
 
 def test_missing_cards_explains_where_to_download(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr("rpent.utils.resources.ensure_resources", lambda _: None)
+    monkeypatch.setattr("rpent.memory.MemoryManager.sync", lambda *args, **kwargs: None)
 
     with pytest.raises(FileNotFoundError, match="RLinf/RPent-memory") as error:
         cards(tmp_path / "task_card")

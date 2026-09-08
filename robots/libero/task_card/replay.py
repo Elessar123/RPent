@@ -40,14 +40,13 @@ from robots.libero import tools as libero_tools
 from robots.libero.task_card.prompts import build as prompt_for
 from rpent.robots.components.molmo_client import MolmoClient
 from rpent.session import EnvState
-from rpent.utils.config import get_resources_dir
+from rpent.utils.config import get_memory_dir
 
 #: ``<family>_<suite>_t<task>_s<seed>``, the tag the CLI builds per cell.
 _CELL = re.compile(r"^(10|goal|object|spatial)_(task|swap)_t(\d+)_s(\d+)$")
 
-#: The card corpus, under ``resources/libero/`` beside the curated memory and
-#: the per-family reference results the prompts already read from there.
-CARDS = get_resources_dir("libero") / "task_card"
+#: The card corpus distributed with the LIBERO memory dataset.
+CARDS = get_memory_dir("libero") / "task_card"
 
 #: A close reading further than this from the coarse one has found something
 #: else, so the coarse one stands.
@@ -222,15 +221,18 @@ def cards(root: Path | None = None) -> Path:
     """
     root = root or CARDS
     if not any(root.glob("*_plan.json")):
+        from rpent.memory import MemoryManager
         from rpent.robots.base import get_robot_spec
-        from rpent.utils.resources import ensure_resources
 
-        ensure_resources(get_robot_spec("libero"))
+        robot_spec = get_robot_spec("libero")
+        MemoryManager(get_memory_dir("libero")).sync(
+            remote_repo=robot_spec.memory_repo_id,
+        )
     if not any(root.glob("*_plan.json")):
         raise FileNotFoundError(
             f"no task cards found under {root}; download "
             "'libero/task_card/**' from the RLinf/RPent-memory "
-            "Hugging Face dataset into resources/"
+            "Hugging Face dataset into memory/"
         )
     return root
 

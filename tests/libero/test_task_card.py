@@ -146,6 +146,57 @@ def test_pick_retry_reuses_relocated_move_arguments() -> None:
     assert all(args["xyz"] == [0.21, 0.08, 0.7] for args in retried_moves)
 
 
+def test_replay_stops_when_attached_anchor_is_not_located() -> None:
+    toolkit = _Toolkit()
+    notes = []
+
+    result = replay(
+        toolkit,
+        molmo=SimpleNamespace(),
+        card={
+            "plan": [
+                {
+                    "action": "move_to",
+                    "arguments": {"xyz": [0.3, 0.2, 0.7], "gripper": -1},
+                    "anchor": "bowl",
+                    "anchor_distance": 0.0,
+                    "offset": [0.01, -0.02],
+                },
+                {"action": "release", "arguments": {}},
+            ],
+            "reference": {"bowl": [0.0, 0.0]},
+            "locator_of": {"bowl": "segment"},
+        },
+        note=notes.append,
+    )
+
+    assert result["done"] is False
+    assert [name for name, _ in toolkit.calls] == ["segment"]
+    assert any("unavailable; stopping replay" in note for note in notes)
+
+
+def test_replay_propagates_toolkit_exceptions() -> None:
+    class FailingToolkit(_Toolkit):
+        def execute_tool(self, name: str, arguments: dict):
+            raise ConnectionError("RPC disconnected")
+
+    with pytest.raises(ConnectionError, match="RPC disconnected"):
+        replay(
+            FailingToolkit(),
+            molmo=SimpleNamespace(),
+            card={
+                "plan": [
+                    {
+                        "action": "move_to",
+                        "arguments": {"xyz": [0.1, 0.1, 0.7], "gripper": -1},
+                    }
+                ],
+                "reference": {},
+                "locator_of": {},
+            },
+        )
+
+
 def test_task_card_rejects_unsupported_suite() -> None:
     args = SimpleNamespace(
         suite="libero_goal_swap",

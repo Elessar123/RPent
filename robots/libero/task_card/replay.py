@@ -383,75 +383,75 @@ def replay(
             if name != "pi0_pick":
                 continue
             skip_suffix = False
-        try:
-            if name in {"move_to", "move_pose"}:
-                xyz = arguments.get("xyz") or []
-                if len(xyz) != 3:
-                    continue
-                target = np.array(xyz[:2], dtype=float)
-                phrase = entry.get("anchor")
-                if phrase in live and entry.get("anchor_distance", 9) <= MAX_ATTACH:
-                    target = live[phrase] + np.array(entry["offset"])
-                held = arguments.get("gripper", -1) == 1
-                if held:
-                    target = target - offset
-                if max(abs(target[0]), abs(target[1])) > REACH:
-                    continue
-                arguments["xyz"] = [
-                    round(float(target[0]), 4),
-                    round(float(target[1]), 4),
-                    float(xyz[2]),
-                ]
-                execute(toolkit, name, arguments)
-                look()
-            elif name in {"segment", "segment_point"}:
+        if name in {"move_to", "move_pose"}:
+            xyz = arguments.get("xyz") or []
+            if len(xyz) != 3:
                 continue
-            elif name in {"pi0_pick", "pi0_doubled"}:
-                prompt = str(arguments.get("prompt", ""))
-                stripped = re.sub(r"^(pick up|grasp)\s+the\s+", "", prompt, flags=re.I)
-                held_phrase = re.split(r"\b(on|in|into|inside|by|and)\b", stripped)[
-                    0
-                ].strip()
-                if name == "pi0_pick":
-                    arguments.update(TASK_CARD_PICK_THRESHOLDS)
-                raw = execute(toolkit, name, arguments)
-                look()
-                if name == "pi0_pick" and not pick_succeeded(raw):
-                    for _ in range(PICK_ATTEMPTS - 1):
-                        if finished():
-                            break
-                        for again, again_args in recent:
-                            execute(toolkit, again, dict(again_args))
-                        raw = execute(toolkit, name, dict(arguments))
-                        look()
-                        if pick_succeeded(raw):
-                            break
-                    if not pick_succeeded(raw):
-                        note("      pick unconfirmed, skipping its carry")
-                        skip_suffix = True
-            elif name == "set_gripper":
-                execute(toolkit, name, arguments)
-                held_step = look()
-                body = held_body(
-                    molmo, state, held_step, prompt_for("held", held_phrase)
-                )
-                eef = np.asarray(state.get(held_step).state["robot0_eef_pos"][:2])
-                candidate = body["xy"] - eef if body is not None else None
-                if candidate is not None and np.linalg.norm(candidate) <= MAX_HELD:
-                    offset = candidate
-                    note(f"      held offset ({offset[0]:+.4f},{offset[1]:+.4f})")
-                else:
-                    offset = np.zeros(2)
-            elif name == "release":
-                execute(toolkit, name, arguments)
-                offset = np.zeros(2)
-                look()
+            target = np.array(xyz[:2], dtype=float)
+            phrase = entry.get("anchor")
+            attached = (
+                phrase is not None and entry.get("anchor_distance", 9) <= MAX_ATTACH
+            )
+            if attached and phrase not in live:
+                note(f"      {phrase[:26]!r} unavailable; stopping replay")
+                break
+            if attached:
+                target = live[phrase] + np.array(entry["offset"])
+            held = arguments.get("gripper", -1) == 1
+            if held:
+                target = target - offset
+            if max(abs(target[0]), abs(target[1])) > REACH:
+                continue
+            arguments["xyz"] = [
+                round(float(target[0]), 4),
+                round(float(target[1]), 4),
+                float(xyz[2]),
+            ]
+            execute(toolkit, name, arguments)
+            look()
+        elif name in {"segment", "segment_point"}:
+            continue
+        elif name in {"pi0_pick", "pi0_doubled"}:
+            prompt = str(arguments.get("prompt", ""))
+            stripped = re.sub(r"^(pick up|grasp)\s+the\s+", "", prompt, flags=re.I)
+            held_phrase = re.split(r"\b(on|in|into|inside|by|and)\b", stripped)[
+                0
+            ].strip()
+            if name == "pi0_pick":
+                arguments.update(TASK_CARD_PICK_THRESHOLDS)
+            raw = execute(toolkit, name, arguments)
+            look()
+            if name == "pi0_pick" and not pick_succeeded(raw):
+                for _ in range(PICK_ATTEMPTS - 1):
+                    if finished():
+                        break
+                    for again, again_args in recent:
+                        execute(toolkit, again, dict(again_args))
+                    raw = execute(toolkit, name, dict(arguments))
+                    look()
+                    if pick_succeeded(raw):
+                        break
+                if not pick_succeeded(raw):
+                    note("      pick unconfirmed, skipping its carry")
+                    skip_suffix = True
+        elif name == "set_gripper":
+            execute(toolkit, name, arguments)
+            held_step = look()
+            body = held_body(molmo, state, held_step, prompt_for("held", held_phrase))
+            eef = np.asarray(state.get(held_step).state["robot0_eef_pos"][:2])
+            candidate = body["xy"] - eef if body is not None else None
+            if candidate is not None and np.linalg.norm(candidate) <= MAX_HELD:
+                offset = candidate
+                note(f"      held offset ({offset[0]:+.4f},{offset[1]:+.4f})")
             else:
-                execute(toolkit, name, arguments)
-                look()
-        except Exception as exc:
-            note(f"      {name} raised {type(exc).__name__}: {str(exc)[:70]}")
-            break
+                offset = np.zeros(2)
+        elif name == "release":
+            execute(toolkit, name, arguments)
+            offset = np.zeros(2)
+            look()
+        else:
+            execute(toolkit, name, arguments)
+            look()
         if name in {"release", "pi0_pick", "pi0_doubled"}:
             recent.clear()
         elif name in {"move_to", "move_pose", "set_gripper", "rotate_wrist"}:

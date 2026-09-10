@@ -75,6 +75,36 @@ There is one card for each supported task.
 The task selects the card. The seed changes the environment layout, not the
 card used for the task.
 
+Generate a task card
+--------------------
+
+The generator creates one card from one simulator-verified successful episode.
+It does not search, rank, replay, or compare other seeds. Its two required inputs
+are the episode audit JSON and the matching primitive recipe JSONL:
+
+.. code-block:: bash
+
+   python -m robots.libero.task_card.generate \
+     --audit results/goal_swap_t3_s7.json \
+     --recipe results/recipe_goal_swap_t3_s7.jsonl \
+     --destination memory/libero/task_card
+
+The audit must contain a non-empty ``task_language`` (or
+``perturbed_task_language``) and ``libero_terminated: true``. The audit and
+recipe filenames, plus the audit suite/task/seed fields when present, must
+identify the same episode.
+
+If ``segment_*.json`` readings were saved for the episode, pass their directory
+with ``--segments``. Otherwise the generator derives semantic Molmo anchors from
+the instruction and the recipe's ordered pick/release or articulation
+transactions. Nearby ``move_to`` and ``move_pose`` coordinates are stored as XY
+offsets from those anchors, in the format consumed by task-card replay.
+
+The relation parser supports all 80 LIBERO-PRO tasks: Spatial, Object, Goal, and
+Long (``10``), across both task and swap suites. Long instructions are preserved
+as ordered transactions, including dependent actions such as turning on the
+stove before placement or closing an appliance after insertion.
+
 To download only the task cards manually, run:
 
 .. code-block:: bash
@@ -93,8 +123,8 @@ Start Molmo first, then pass its endpoint to RPent:
      --suite libero_object_swap --task 3 --seed 0 \
      --molmo-endpoint http://127.0.0.1:20703
 
-Task-card replay currently supports the ``libero_object_task`` and
-``libero_object_swap`` suites. Other LIBERO suites do not yet have task cards.
+Task-card replay supports the task and swap suites for LIBERO-PRO Spatial,
+Object, Goal, and Long (``10``), for 80 task identities in total.
 
 The VLA and SAM3 services use the normal LIBERO runtime configuration. You can
 also connect to services that are already running with ``--vla-endpoint`` and

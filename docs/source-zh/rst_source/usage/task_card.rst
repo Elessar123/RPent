@@ -62,6 +62,32 @@ RPent 将实时锚点位置与任务卡保存的偏移组合成新的路点，�
 
 任务决定使用哪张卡；seed 只改变环境布局，不改变该任务使用的任务卡。
 
+生成任务卡
+----------
+
+生成器从一条经模拟器确认成功的 episode 生成一张卡，不会搜索、排名、重放或比较
+其他 seed。必需输入只有 episode audit JSON 和与之匹配的 primitive recipe JSONL：
+
+.. code-block:: bash
+
+   python -m robots.libero.task_card.generate \
+     --audit results/goal_swap_t3_s7.json \
+     --recipe results/recipe_goal_swap_t3_s7.jsonl \
+     --destination memory/libero/task_card
+
+audit 必须包含非空的 ``task_language``（或 ``perturbed_task_language``）以及
+``libero_terminated: true``。audit 和 recipe 的文件名，以及 audit 中存在的
+suite/task/seed 字段，必须指向同一个 episode。
+
+如果 episode 保存了 ``segment_*.json`` 读数，可通过 ``--segments`` 指定目录；
+否则生成器会根据任务指令以及 recipe 中有序的抓取/释放或关节交互 transaction，
+生成供 Molmo 使用的语义锚点。附近的 ``move_to`` 和 ``move_pose`` 坐标会被保存成
+相对锚点的 XY offset，与 PR111 的 task-card replay 格式一致。
+
+关系解析覆盖 LIBERO-PRO 全部 80 个任务：Spatial、Object、Goal、Long（``10``）
+各自的 task 和 swap suite。Long 的 transaction 顺序会被保留，例如先打开炉灶再
+放置物体，或者先把物体放进设备再关闭设备。
+
 如果只想手动下载任务卡，可以运行：
 
 .. code-block:: bash
@@ -80,8 +106,8 @@ RPent 将实时锚点位置与任务卡保存的偏移组合成新的路点，�
      --suite libero_object_swap --task 3 --seed 0 \
      --molmo-endpoint http://127.0.0.1:20703
 
-任务卡重放目前支持 ``libero_object_task`` 和 ``libero_object_swap``。其他
-LIBERO suite 暂时还没有对应的任务卡。
+任务卡重放支持 LIBERO-PRO Spatial、Object、Goal、Long（``10``）的 task 和
+swap suite，共 80 个 task identity。
 
 VLA 和 SAM3 沿用普通 LIBERO 运行方式。也可以通过 ``--vla-endpoint`` 和
 ``--sam3-endpoint`` 连接已经启动的服务。

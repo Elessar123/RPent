@@ -17,25 +17,25 @@ decisions. Molmo is used only for visual localization: it points to a requested
 object or location in a camera image so RPent can recover its current
 coordinates.
 
-Performance and execution time
-------------------------------
+LIBERO-PRO performance and execution time
+-----------------------------------------
 
-On the 200 LIBERO Object evaluations (20 tasks and 10 seeds per task), Task
-Card solved 179 episodes (89.5%), compared with 186 (93.0%) for Codex without
-reasoning. Its mean execution time was 40.9 seconds per episode, compared with
-283.6 seconds for Codex.
+Across the complete 800-case LIBERO-PRO matrix (Spatial, Object, Goal, and Long;
+task/swap; 10 seeds per task), Task Card solved 581 episodes (72.63%). Codex
+without reasoning solved 485 (60.62%), while Codex with high reasoning solved
+618 (77.25%). The two tasks without a successful source trace and therefore no
+Task Card are conservatively counted as 0/10.
 
-.. image:: ../../_static/task_card_object_performance_time.png
-   :alt: Per-task performance and execution-time comparison between Task Card and Codex without reasoning on LIBERO Object
+.. image:: ../../_static/task_card_libero_pro_performance_time.png
+   :alt: Per-task success rate and execution-time comparison between Task Card and Codex on all LIBERO-PRO suites
    :width: 100%
    :align: center
 
 The timing excludes model and service startup. Codex time is the mean planner
-execution time over the 10 evaluated seeds for each task. The original
-10-seed Task Card timing logs are no longer available, so its timing bars use
-the tool-execution time from the recorded episode underlying each final card
-(one timing sample per task). The success rates use the complete 200-episode
-evaluation in both cases.
+execution time over available records for each task. Task Card timing uses the
+tool-execution time from the successful episode underlying each final card
+(one timing sample per card), following the PR111 convention. Success rates use
+the complete 800-case matrix for every method.
 
 How replay works
 ----------------

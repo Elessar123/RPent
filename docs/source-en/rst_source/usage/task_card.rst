@@ -22,8 +22,8 @@ LIBERO-PRO performance and execution time
 
 Across the complete 800-case LIBERO-PRO matrix (Spatial, Object, Goal, and Long;
 task/swap; 10 seeds per task), Task Card solved 581 episodes (72.63%). Codex
-without reasoning solved 485 (60.62%), while Codex with high reasoning solved
-618 (77.25%). The two tasks without a successful source trace and therefore no
+without reasoning solved 500 (62.50%), while Codex with high reasoning solved
+628 (78.50%). The two tasks without a successful source trace and therefore no
 Task Card are conservatively counted as 0/10.
 
 .. image:: ../../_static/task_card_libero_pro_performance_time.png
@@ -35,7 +35,8 @@ The timing excludes model and service startup. Codex time is the mean planner
 execution time over available records for each task. Task Card timing uses the
 tool-execution time from the successful episode underlying each final card
 (one timing sample per card), following the PR111 convention. Success rates use
-the complete 800-case matrix for every method.
+the complete 800-case matrix for every method. Both Codex baselines have planner
+duration records for all 800 cases.
 
 How replay works
 ----------------

@@ -19,8 +19,8 @@
 
 在完整的 800-case LIBERO-PRO 矩阵（Spatial、Object、Goal 和 Long；
 task/swap；每个任务 10 个 seed）上，Task Card 成功 581 次（72.63%）。
-不使用 reasoning 的 Codex 成功 485 次（60.62%），high reasoning Codex
-成功 618 次（77.25%）。两个没有成功源轨迹、因而没有 Task Card 的任务
+不使用 reasoning 的 Codex 成功 500 次（62.50%），high reasoning Codex
+成功 628 次（78.50%）。两个没有成功源轨迹、因而没有 Task Card 的任务
 按 0/10 保守计入。
 
 .. image:: ../../_static/task_card_libero_pro_performance_time.png
@@ -31,6 +31,7 @@ task/swap；每个任务 10 个 seed）上，Task Card 成功 581 次（72.63%�
 时间统计不包含模型及服务启动时间。Codex 时间是每个任务可用 planner 耗时记录的
 均值。Task Card 耗时遵循 PR111 口径，采用每张最终任务卡对应成功 episode 的
 工具执行时间（每张卡一个耗时样本）。所有方法的成功率都使用完整 800-case 矩阵。
+两组 Codex baseline 均有完整的 800/800 planner 耗时记录。
 
 重放流程
 --------

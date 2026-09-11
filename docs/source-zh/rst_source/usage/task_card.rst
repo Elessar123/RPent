@@ -14,22 +14,23 @@
 因此，``--planner task_card`` 不会调用 LLM 重新规划动作。Molmo 在这里只负责视觉
 定位：它在相机画面中指出指定的物体或位置，RPent 再将该像素转换成当前场景坐标。
 
-性能与执行时间
---------------
+全系列 LIBERO-PRO 性能与执行时间
+-------------------------------------
 
-在 LIBERO Object 的 200 次评测（20 个任务，每个任务 10 个 seed）中，Task Card
-成功完成 179 次（89.5%），不使用 reasoning 的 Codex 成功完成 186 次（93.0%）。
-Task Card 的平均执行时间为每个 episode 40.9 秒，Codex 为 283.6 秒。
+在完整的 800-case LIBERO-PRO 矩阵（Spatial、Object、Goal 和 Long；
+task/swap；每个任务 10 个 seed）上，Task Card 成功 581 次（72.63%）。
+不使用 reasoning 的 Codex 成功 485 次（60.62%），high reasoning Codex
+成功 618 次（77.25%）。两个没有成功源轨迹、因而没有 Task Card 的任务
+按 0/10 保守计入。
 
-.. image:: ../../_static/task_card_object_performance_time.png
-   :alt: Task Card 与不使用 reasoning 的 Codex 在 LIBERO Object 上的逐任务性能和执行时间对比
+.. image:: ../../_static/task_card_libero_pro_performance_time.png
+   :alt: Task Card 与 Codex 在 LIBERO-PRO 全系列上的逐任务成功率和执行时间对比
    :width: 100%
    :align: center
 
-时间统计不包含模型及服务启动时间。Codex 时间是每个任务 10 个评测 seed 的 planner
-执行时间均值。Task Card 原始 10-seed 耗时日志已经不可用，因此图中的 Task Card
-耗时采用每张最终任务卡对应录制 episode 的工具执行时间（每个任务一个耗时样本）。
-两种方法的成功率均来自完整的 200-episode 评测。
+时间统计不包含模型及服务启动时间。Codex 时间是每个任务可用 planner 耗时记录的
+均值。Task Card 耗时遵循 PR111 口径，采用每张最终任务卡对应成功 episode 的
+工具执行时间（每张卡一个耗时样本）。所有方法的成功率都使用完整 800-case 矩阵。
 
 重放流程
 --------

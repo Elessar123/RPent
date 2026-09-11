@@ -29,7 +29,7 @@ task/swap；每个任务 10 个 seed）上，Task Card 成功 581 次（72.63%�
    :align: center
 
 时间统计不包含模型及服务启动时间。Codex 时间是每个任务可用 planner 耗时记录的
-均值。Task Card 耗时遵循 PR111 口径，采用每张最终任务卡对应成功 episode 的
+均值。Task Card 耗时采用每张最终任务卡对应成功 episode 的
 工具执行时间（每张卡一个耗时样本）。所有方法的成功率都使用完整 800-case 矩阵。
 两组 Codex baseline 均有完整的 800/800 planner 耗时记录。
 
@@ -67,8 +67,8 @@ RPent 将实时锚点位置与任务卡保存的偏移组合成新的路点，�
 生成任务卡
 ----------
 
-生成器从一条经模拟器确认成功的 episode 生成一张卡，不会搜索、排名、重放或比较
-其他 seed。必需输入只有 episode audit JSON 和与之匹配的 primitive recipe JSONL：
+生成器从一条经模拟器确认成功的 episode 生成一张卡。必需输入只有
+episode audit JSON 和与之匹配的 primitive recipe JSONL：
 
 .. code-block:: bash
 
@@ -84,7 +84,7 @@ suite/task/seed 字段，必须指向同一个 episode。
 如果 episode 保存了 ``segment_*.json`` 读数，可通过 ``--segments`` 指定目录；
 否则生成器会根据任务指令以及 recipe 中有序的抓取/释放或关节交互 transaction，
 生成供 Molmo 使用的语义锚点。附近的 ``move_to`` 和 ``move_pose`` 坐标会被保存成
-相对锚点的 XY offset，与 PR111 的 task-card replay 格式一致。
+相对锚点的 XY offset，供 task-card replay 直接使用。
 
 关系解析覆盖 LIBERO-PRO 全部 80 个任务：Spatial、Object、Goal、Long（``10``）
 各自的 task 和 swap suite。Long 的 transaction 顺序会被保留，例如先打开炉灶再

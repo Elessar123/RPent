@@ -34,9 +34,9 @@ Task Card are conservatively counted as 0/10.
 The timing excludes model and service startup. Codex time is the mean planner
 execution time over available records for each task. Task Card timing uses the
 tool-execution time from the successful episode underlying each final card
-(one timing sample per card), following the PR111 convention. Success rates use
-the complete 800-case matrix for every method. Both Codex baselines have planner
-duration records for all 800 cases.
+(one timing sample per card). Success rates use the complete 800-case matrix for
+every method. Both Codex baselines have planner duration records for all 800
+cases.
 
 How replay works
 ----------------
@@ -80,8 +80,8 @@ Generate a task card
 --------------------
 
 The generator creates one card from one simulator-verified successful episode.
-It does not search, rank, replay, or compare other seeds. Its two required inputs
-are the episode audit JSON and the matching primitive recipe JSONL:
+Its two required inputs are the episode audit JSON and the matching primitive
+recipe JSONL:
 
 .. code-block:: bash
 

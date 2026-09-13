@@ -25,8 +25,9 @@ from typing import Any
 import numpy as np
 
 from robots.dual_franka.runtime_config import load_runtime_config
-from robots.franka.env_server import FrankaEnvFacade, _to_numpy_tree, main
+from robots.franka.env_server import FrankaEnvFacade, main
 from rpent.utils.config import get_repo_root, get_rlinf_repo_path
+from rpent.utils.serialization import to_numpy_tree
 
 # Resolve the RLinf checkout before the deferred ``import rlinf`` executes.
 RPENT_ROOT = get_repo_root()
@@ -181,7 +182,7 @@ def _create_worker_class():
             self.last_obs = observation
             return {
                 "ok": True,
-                "info": _to_numpy_tree(info),
+                "info": to_numpy_tree(info),
                 "robot_state": self.get_robot_state(),
             }
 
@@ -197,7 +198,7 @@ def _create_worker_class():
 
         @staticmethod
         def _strip_batch(value: Any) -> Any:
-            array = _to_numpy_tree(value)
+            array = to_numpy_tree(value)
             if isinstance(array, np.ndarray) and array.ndim > 0 and array.shape[0] == 1:
                 return array[0]
             if isinstance(array, list) and len(array) == 1:
@@ -219,7 +220,7 @@ def _create_worker_class():
             snapshot_getter = self.env.env.call(
                 "get_wrapper_attr", "get_raw_camera_snapshot"
             )[0]
-            snapshot = _to_numpy_tree(snapshot_getter())
+            snapshot = to_numpy_tree(snapshot_getter())
             output["raw_camera_frames"] = snapshot.get("raw_frames", {})
             output["raw_camera_depths"] = snapshot.get("raw_depths", {})
             perception = self._capture_perception_camera_snapshot()
@@ -322,7 +323,9 @@ def _create_worker_class():
         def _calibration_bundle(self) -> dict[str, Any]:
             bundle = getattr(self, "_dual_franka_calibration_bundle", None)
             if bundle is None:
-                bundle = load_calibration_bundle(self.controller.get("calibration_path"))
+                bundle = load_calibration_bundle(
+                    self.controller.get("calibration_path")
+                )
                 self._dual_franka_calibration_bundle = bundle
             return bundle
 
@@ -416,8 +419,7 @@ def _create_worker_class():
                     "status": status,
                     "reason": "missing arm_joint_position",
                     "native": native["summary"],
-                    "reasons": native["critical_reasons"]
-                    or native["warning_reasons"],
+                    "reasons": native["critical_reasons"] or native["warning_reasons"],
                 }
             q_arr = np.asarray(q, dtype=np.float32)
             raw = self._raw_rlinf_env()
@@ -548,30 +550,24 @@ def _create_worker_class():
                     "robot_mode": mode_text,
                     "has_errors": state.get("has_errors"),
                     "current_errors": active_flags(state.get("current_errors")),
-                    "last_motion_errors": active_flags(
-                        state.get("last_motion_errors")
-                    ),
+                    "last_motion_errors": active_flags(state.get("last_motion_errors")),
                     "joint_contact": any_array(state.get("joint_contact")),
                     "cartesian_contact": any_array(state.get("cartesian_contact")),
                     "joint_collision": any_array(state.get("joint_collision")),
-                    "cartesian_collision": any_array(
-                        state.get("cartesian_collision")
-                    ),
+                    "cartesian_collision": any_array(state.get("cartesian_collision")),
                 },
             }
 
         def get_robot_state(self) -> dict[str, Any]:
             left, right = self._arm_states()
-            left_raw = _to_numpy_tree(left)
-            right_raw = _to_numpy_tree(right)
+            left_raw = to_numpy_tree(left)
+            right_raw = to_numpy_tree(right)
             left_out = dict(left_raw)
             right_out = dict(right_raw)
             if "tcp_pose" in left_raw:
                 left_out["raw_tcp_pose"] = left_raw["tcp_pose"]
                 left_out["raw_tcp_pose_frame"] = "left_base"
-                left_out["tcp_pose"] = self._pose_to_world(
-                    "left", left_raw["tcp_pose"]
-                )
+                left_out["tcp_pose"] = self._pose_to_world("left", left_raw["tcp_pose"])
                 left_out["tcp_pose_frame"] = "right_base"
             if "tcp_pose" in right_raw:
                 right_out["raw_tcp_pose"] = right_raw["tcp_pose"]
@@ -616,7 +612,7 @@ def _create_worker_class():
             metadata_getter = self.env.env.call(
                 "get_wrapper_attr", "get_raw_camera_metadata"
             )[0]
-            metadata.update(_to_numpy_tree(metadata_getter()))
+            metadata.update(to_numpy_tree(metadata_getter()))
             metadata.update(self._perception_camera_meta)
             return {
                 "cameras": cameras,
@@ -934,7 +930,7 @@ def _create_worker_class():
                     "target_gripper_open": start_gripper_open,
                     "before_gripper_open": before,
                     "after_gripper_open": after,
-                    "commands": _to_numpy_tree(commands),
+                    "commands": to_numpy_tree(commands),
                 }
 
             raw = self._raw_rlinf_env()
@@ -990,7 +986,7 @@ def _create_worker_class():
                     "stage": stage,
                     "target_gripper_open": start_gripper_open,
                     "after_gripper_open": after,
-                    "results": _to_numpy_tree(results),
+                    "results": to_numpy_tree(results),
                     "errors": {arm: str(exc) for arm, exc in errors.items()},
                     "reclamp_closed_grippers": True,
                 }
@@ -1115,13 +1111,13 @@ def _create_worker_class():
                 "after_joint_reset": {
                     "joint_health": after_reset_state.get("joint_health"),
                     "gripper_open": gripper_open_from_state(after_reset_state),
-                    "reset_results": _to_numpy_tree(reset_results),
+                    "reset_results": to_numpy_tree(reset_results),
                 },
-                "direct_gripper_command_results": _to_numpy_tree(
+                "direct_gripper_command_results": to_numpy_tree(
                     direct_gripper_command_results
                 ),
-                "gripper_restore_results": _to_numpy_tree(gripper_restore_results),
-                "return_results": _to_numpy_tree(return_results),
+                "gripper_restore_results": to_numpy_tree(gripper_restore_results),
+                "return_results": to_numpy_tree(return_results),
                 "final": {
                     "coordinate_frame": "right_base",
                     "joint_health": final_state.get("joint_health"),
@@ -1150,9 +1146,9 @@ def _create_worker_class():
                 )
                 self.last_obs = observation
                 observations.append(self.get_observation())
-                terminated = terminated or bool(np.asarray(_to_numpy_tree(term)).any())
-                truncated = truncated or bool(np.asarray(_to_numpy_tree(trunc)).any())
-                last_info = _to_numpy_tree(info)
+                terminated = terminated or bool(np.asarray(to_numpy_tree(term)).any())
+                truncated = truncated or bool(np.asarray(to_numpy_tree(trunc)).any())
+                last_info = to_numpy_tree(info)
                 if terminated or truncated:
                     break
             return {

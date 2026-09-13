@@ -244,7 +244,13 @@ def _build_argparser() -> argparse.ArgumentParser:
     return ap
 
 
-def _handoff_message(output_dir, session_number: int, session_max: int) -> str:
+def _handoff_message(
+    output_dir,
+    session_number: int,
+    session_max: int,
+    *,
+    robot_name: str,
+) -> str:
     """Build the opening message for a continuation session."""
     attempts_dir = Path(output_dir) / "attempts"
     prior = (
@@ -252,14 +258,23 @@ def _handoff_message(output_dir, session_number: int, session_max: int) -> str:
         if attempts_dir.is_dir()
         else []
     )
+    reset_note = (
+        "A fresh toolkit has already restored a clean scene; inspect it before acting."
+    )
+    if robot_name == "dual_franka":
+        reset_note = (
+            "This is a real-robot continuation: the physical scene is not "
+            "automatically reset by toolkit construction. If a clean restored "
+            "scene is required, call `request_scene_reset` and wait for the "
+            "operator confirmation before acting."
+        )
     return (
         f"You are agent {session_number} of up to {session_max} on this cell. "
         f"{len(prior)} attempt(s) by earlier agents are archived in "
         f"{attempts_dir}/ ({', '.join(prior) if prior else 'none yet'}), and their "
         "working notes are in the memory inbox under wip/.\n\n"
         "Read every archive and the working notes before acting. Do not repeat "
-        "failed approaches. A fresh toolkit has already restored a clean scene; "
-        "inspect it before acting."
+        f"failed approaches. {reset_note}"
     )
 
 
@@ -298,7 +313,12 @@ def _start_continuation_session(
             "session_max": session_max,
         },
     )
-    session_message = _handoff_message(output_dir, session_number, session_max)
+    session_message = _handoff_message(
+        output_dir,
+        session_number,
+        session_max,
+        robot_name=args.robot_name,
+    )
     return planner, system_prompt, session_message
 
 
@@ -337,8 +357,8 @@ def main() -> int:
             f"{args.planner} reads its endpoint from "
             f"{BASE_URL_ENV_BY_PLANNER[args.planner]} instead"
         )
-    if args.explore and args.robot_name != "libero":
-        parser.error("--explore is currently supported only for LIBERO")
+    if args.explore and not getattr(robot_spec, "supports_exploration", False):
+        parser.error(f"--explore is not supported for robot {args.robot_name!r}")
     if args.explore and args.memory_profile == "hf":
         parser.error("--explore cannot be used with --memory-profile hf")
     if args.explore and getattr(args, "explore_sessions", 1) <= 0:
@@ -468,7 +488,7 @@ def main() -> int:
                 state_output_dir = (
                     output_dir / "sessions" / f"session_{session_number:03d}"
                 )
-            if robot_name == "libero":
+            if getattr(robot_spec, "supports_exploration", False):
                 toolkit = get_toolkit(
                     robot_name,
                     primitives_kwargs=primitives_kwargs,
@@ -500,15 +520,22 @@ def main() -> int:
                 messages += result.messages
                 stats = result.stats
                 agent_error = result.error
-                if robot_name == "libero":
-                    solved = toolkit.solved()
-                    if solved:
-                        recipe_path = toolkit.write_recipe(recipe_tag)
+                solved_fn = getattr(toolkit, "solved", None)
+                if getattr(robot_spec, "supports_exploration", False) and callable(
+                    solved_fn
+                ):
+                    solved = bool(solved_fn())
+                    write_recipe = getattr(toolkit, "write_recipe", None)
+                    if solved and callable(write_recipe):
+                        recipe_path = write_recipe(recipe_tag) or recipe_path
             finally:
                 try:
                     if robot_spec.finalize_run is not None:
-                        environment_success = bool(toolkit.solved())
-                        solved = environment_success
+                        solved_fn = getattr(toolkit, "solved", None)
+                        environment_success = (
+                            bool(solved_fn()) if callable(solved_fn) else None
+                        )
+                        solved = bool(environment_success)
                 finally:
                     toolkit.close()
             if solved:

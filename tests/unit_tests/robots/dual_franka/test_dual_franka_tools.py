@@ -23,6 +23,7 @@ import pytest
 
 from robots.dual_franka.perception import back_project, segment
 from robots.dual_franka.tasks import CLEAN_DESK_VLA_PROMPT
+from robots.dual_franka.toolkit import DualFrankaToolkit
 from robots.dual_franka.tools import (
     DualFrankaPrimitives,
     coerce_arm,
@@ -32,6 +33,8 @@ from robots.dual_franka.tools import (
 )
 from robots.franka.runtime_config import set_calibration_path
 from robots.franka.tools import view_camera_meta
+from rpent.dashboard.events import NullDashboardEventSink
+from rpent.memory import MemoryManager
 from rpent.session import EnvState
 from rpent.tools.toolkit import ToolResult
 
@@ -179,6 +182,57 @@ def _primitives(env: FakeEnv, *, model=None, check_cancelled=lambda: None):
         task_description="default task",
         check_cancelled=check_cancelled,
     )
+
+
+def _tool_names(toolkit: DualFrankaToolkit) -> set[str]:
+    return set(toolkit._tools)
+
+
+def test_toolkit_exploration_tools_are_opt_in(tmp_path: Path):
+    base_kwargs = {
+        "env": FakeEnv(),
+        "model": None,
+        "task_description": "default task",
+    }
+    evaluation = DualFrankaToolkit(
+        primitives_kwargs=dict(base_kwargs),
+        dashboard_events=NullDashboardEventSink(),
+        memory=MemoryManager(tmp_path / "eval-memory"),
+        mode="evaluation",
+        state_output_dir=tmp_path / "eval-state",
+    )
+    exploration = DualFrankaToolkit(
+        primitives_kwargs=dict(base_kwargs),
+        dashboard_events=NullDashboardEventSink(),
+        memory=MemoryManager(
+            tmp_path / "explore-memory",
+            memory_access="inbox_write",
+            inbox_cell_tag="dual_franka_t4",
+        ),
+        mode="exploration",
+        attempts_per_session=2,
+        state_output_dir=tmp_path / "explore-state",
+    )
+
+    assert "request_scene_reset" not in _tool_names(evaluation)
+    assert "request_operator_verdict" not in _tool_names(evaluation)
+    assert "request_scene_reset" in _tool_names(exploration)
+    assert "request_operator_verdict" in _tool_names(exploration)
+
+    refused = exploration.execute_tool(
+        "finish",
+        {"status": "success", "summary": "agent thinks done"},
+    )
+    assert refused.result["error"] == "finish refused"
+    assert refused.is_finish is False
+
+    exploration._operator_verdict = "success"
+    accepted = exploration.execute_tool(
+        "finish",
+        {"status": "success", "summary": "operator accepted"},
+    )
+    assert accepted.is_finish is True
+    assert accepted.result["operator_verdict"] == "success"
 
 
 def test_arm_and_vec3_validation_and_motion_forwarding():

@@ -776,6 +776,117 @@ Validation performed:
   - `.venv/bin/python -m py_compile robots/dual_franka/runtime_config.py robots/dual_franka/env_server.py robots/dual_franka/perception.py robots/dual_franka/tools.py robots/dual_franka/tasks.py scripts/dual_franka_manual_call.py`
 - Shell syntax:
   - `bash -n scripts/rpent_live_env.sh scripts/run_dual_franka_task3_codex.sh scripts/run_dual_franka_interactive.sh scripts/run_manual_skill.sh`
+
+## 2026-09-13 — migrated dual_franka exploration scaffold onto main-based branch
+
+Status: local working tree change, not yet committed/pushed.
+
+Context:
+
+- User asked to also migrate the exploration framework work to the main-based
+  branch because future real-robot exploration will use this path.
+- Main branch already had a LIBERO exploration loop whose reset semantics
+  restore simulation state. For dual_franka, that behavior is unsafe/incorrect:
+  the physical scene must be restored by an operator, then explicitly confirmed.
+
+Changes:
+
+- File: `rpent/robots/robot_spec.py`
+  - Added `supports_exploration` so the CLI can enable exploration by robot
+    capability instead of hard-coding `libero`.
+- File: `rpent/cli/main.py`
+  - Replaced the LIBERO-only `--explore` gate with the robot capability flag.
+  - Generalized exploration toolkit construction to all robots that opt in.
+  - Kept continuation handoff semantics simulation-specific for LIBERO, but
+    tells dual_franka agents that a real scene is not automatically reset and
+    `request_scene_reset` must be used when operator restoration is needed.
+- File: `robots/libero/robot_spec.py`
+  - Marked LIBERO as supporting exploration to preserve main-branch behavior.
+- Files: `robots/franka/toolkit.py`, `robots/dual_franka/robot_spec.py`,
+  `robots/dual_franka/toolkit.py`, `robots/dual_franka/tools.py`
+  - Added optional `state_output_dir` threading for per-session state logs.
+  - Added dual_franka exploration mode with two exploration-only tools:
+    `request_scene_reset` and `request_operator_verdict`.
+  - `request_scene_reset` pauses for terminal operator confirmation instead of
+    calling a simulator-style environment reset.
+  - Exploration-mode `finish` is guarded until an operator verdict is recorded.
+  - Real-robot memory writes go to a per-task inbox and auto-merge defaults off.
+- Files: `robots/dual_franka/prompt_bundle.py`,
+  `robots/dual_franka/prompts/explore.py`
+  - Added exploration prompt additions only when `mode=explore`, keeping normal
+    task reproduction prompts unchanged.
+- File: `robots/dual_franka/tasks.py`
+  - Registered task 4 as an exploration candidate that intentionally reuses the
+    current task-3 dirty/clean sorting prompt verbatim.
+- Files: `tests/unit_tests/robots/dual_franka/*`,
+  `tests/unit_tests/rpent/cli/test_main_contracts.py`
+  - Added offline coverage for dual_franka exploration registration, prompt
+    opt-in behavior, exploration-only tools, and finish guarding.
+
+Open review notes:
+
+- The exploration candidate still contains the full current dirty/clean prompt.
+  Experience-like rules should be removed selectively only after live
+  exploration confirms which ones the agent can rediscover reliably.
+- Real-robot memory auto-merge is intentionally disabled by default; generated
+  notes should be reviewed before promotion.
+
+Validation performed:
+
+- `.venv/bin/python -m ruff check rpent/cli/main.py rpent/robots/robot_spec.py robots/libero/robot_spec.py robots/franka/toolkit.py robots/dual_franka/robot_spec.py robots/dual_franka/toolkit.py robots/dual_franka/prompt_bundle.py robots/dual_franka/prompts/explore.py robots/dual_franka/tasks.py robots/dual_franka/tools.py tests/unit_tests/robots/dual_franka/test_dual_franka_extension.py tests/unit_tests/robots/dual_franka/test_dual_franka_tools.py tests/unit_tests/rpent/cli/test_main_contracts.py`
+- `.venv/bin/python -m pytest tests/unit_tests/robots/dual_franka tests/unit_tests/rpent/cli/test_main_contracts.py -q`
+
+## 2026-09-13 — removed main-migration compatibility aliases
+
+Status: local working tree change, not yet committed/pushed.
+
+Context:
+
+- User asked to remove the temporary compatibility bridges introduced during
+  the port/franka-to-main migration and refactor the code to a single naming
+  convention.
+
+Changes:
+
+- File: `robots/dual_franka/runtime_config.py`
+  - Removed `DUAL_FRANKA_CONFIG = DEFAULT_CONFIG`; callers now import the
+    public `DEFAULT_CONFIG` name directly.
+- File: `robots/dual_franka/robot_spec.py`
+  - Switched the packaged config import/use site to `DEFAULT_CONFIG`.
+- Files: `robots/franka/env_server.py`, `robots/dual_franka/env_server.py`
+  - Removed the private `_to_numpy_tree` compatibility alias from the
+    single-arm env server.
+  - Switched dual_franka env server to import and call
+    `rpent.utils.serialization.to_numpy_tree` directly.
+- File: `tests/unit_tests/rpent/robots/test_config_contracts.py`
+  - Updated config-contract test imports to the unified constant name.
+
+## 2026-09-13 — reduced task 4 prompt for first-round exploration
+
+Status: local working tree change, not yet committed/pushed.
+
+Context:
+
+- User approved the first-round screening of task-4 dirty/clean exploration
+  hints: keep task semantics/safety, but remove strategy details that should be
+  rediscovered and written as exploration memory if useful.
+
+Changes:
+
+- File: `robots/dual_franka/tasks.py`
+  - Kept task 4's instruction/setup/success criteria aligned with task 3.
+  - Replaced task 4 constraints with a reduced exploration candidate set.
+  - Removed or weakened these task-3 experience hints from task 4:
+    - mandatory D455 localization/sorting table;
+    - SAM3 short-phrase / point-prompt retry recipe;
+    - bowl-specific “do not pre-align, call VLA directly” rule;
+    - fixed 10 cm pre-grasp staging height;
+    - long post-grasp success heuristic based on projected z/TCP offsets;
+    - left-placement staging recipe that hard-coded x/y-only motion and fixed z
+      handling.
+- File: `tests/unit_tests/robots/dual_franka/test_dual_franka_extension.py`
+  - Updated task-4 coverage to assert that the exploration candidate differs
+    from task 3 and no longer contains the removed first-round hints.
 - RLinf lint/syntax:
   - `ruff check rlinf/envs/realworld/franka/franky_controller.py rlinf/envs/realworld/franka/franka_robot_state.py`
   - `py_compile rlinf/envs/realworld/franka/franky_controller.py rlinf/envs/realworld/franka/franka_robot_state.py`

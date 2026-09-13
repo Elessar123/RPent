@@ -16,6 +16,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from robots.franka.tasks import FrankaTask
 
 # Deployment task registry note:
@@ -246,6 +248,71 @@ DUAL_FRANKA_TASKS = {
         ),
     ),
 }
+
+# Exploration candidate for the current dirty/clean sorting demo.  It keeps the
+# task definition and safety-critical tool boundaries from task 3, but removes
+# first-round strategy hints that should be discoverable through exploration:
+# D455 bookkeeping tables, SAM3 phrasing tricks, bowl-specific direct-grasp
+# advice, 10 cm pre-grasp staging, long post-grasp success heuristics, and
+# left-placement x/y/z staging recipes.
+_DIRTY_CLEAN_TASK = DUAL_FRANKA_TASKS[3]
+_DIRTY_CLEAN_CONSTRAINTS = _DIRTY_CLEAN_TASK.constraints
+DUAL_FRANKA_TASKS[4] = replace(
+    _DIRTY_CLEAN_TASK,
+    name="clean_desk_dirty_clean_sorting_agent_vla_explore_candidate",
+    constraints=(
+        _DIRTY_CLEAN_CONSTRAINTS[0],
+        _DIRTY_CLEAN_CONSTRAINTS[1],
+        _DIRTY_CLEAN_CONSTRAINTS[2],
+        _DIRTY_CLEAN_CONSTRAINTS[3],
+        _DIRTY_CLEAN_CONSTRAINTS[4],
+        _DIRTY_CLEAN_CONSTRAINTS[5],
+        (
+            "When SAM3 is available, use segment with camera='d455' on the "
+            "D455 image when it is useful for the current object or required "
+            "placement target. Inspect the returned overlay before acting; if "
+            "segmentation does not support a safe action, use back_project or "
+            "request operator feedback instead."
+        ),
+        _DIRTY_CLEAN_CONSTRAINTS[8],
+        _DIRTY_CLEAN_CONSTRAINTS[9],
+        _DIRTY_CLEAN_CONSTRAINTS[10],
+        (
+            "For any object, decide from the current visual/state evidence "
+            "whether to call vla_right_grasp directly or first use conservative "
+            "free-space staging. Any staging must remain non-contact and safe."
+        ),
+        (
+            "Call vla_right_grasp only after the intended object identity and, "
+            "for bowls or plates, dirty/clean classification are confirmed. If "
+            "you chose pre-grasp staging, continue only after the staging move "
+            "reports a safe/effective target."
+        ),
+        _DIRTY_CLEAN_CONSTRAINTS[14],
+        (
+            "After a grasp VLA, inspect the returned snapshot and verify the "
+            "intended object is plausibly held using gripper and visual "
+            "evidence. If held status, object identity, or source/destination "
+            "evidence is uncertain, use available perception or request "
+            "operator feedback instead of blind retrying or opening a gripper."
+        ),
+        _DIRTY_CLEAN_CONSTRAINTS[16],
+        (
+            "Before vla_left_place, confirm vla_handoff has ended and the left "
+            "gripper holds the intended object. Localize the required "
+            "destination: dirty bowls/plates to the metal wire basket/frame, "
+            "clean bowls/plates and the cup to the cardboard box, and "
+            "chopsticks/spoon to the cup after the cup is stable. If staging is "
+            "needed, use conservative free-space motion and avoid contact or "
+            "collision before calling vla_left_place."
+        ),
+        _DIRTY_CLEAN_CONSTRAINTS[18],
+        _DIRTY_CLEAN_CONSTRAINTS[19],
+        _DIRTY_CLEAN_CONSTRAINTS[20],
+        _DIRTY_CLEAN_CONSTRAINTS[21],
+        _DIRTY_CLEAN_CONSTRAINTS[22],
+    ),
+)
 
 
 def get_dual_franka_task(task_id: int) -> FrankaTask:

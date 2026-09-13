@@ -233,6 +233,50 @@ TOOLS_SPEC = [
             },
         },
     },
+    {
+        "name": "request_scene_reset",
+        "description": (
+            "Exploration-only real-robot reset gate. Ask the human operator to "
+            "restore the tabletop scene for another attempt, then wait for the "
+            "operator to confirm in the runner terminal. This does not "
+            "automatically reset the physical environment like a simulator."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "description": "Why the scene needs to be restored.",
+                },
+                "expected_scene_state": {
+                    "type": "string",
+                    "default": "",
+                    "description": (
+                        "Short instruction for the operator describing the "
+                        "desired restored layout."
+                    ),
+                },
+            },
+            "required": ["reason"],
+        },
+    },
+    {
+        "name": "request_operator_verdict",
+        "description": (
+            "Exploration-only human feedback gate. Ask the operator to mark "
+            "the current physical task state as success, failure, or continue "
+            "before the planner finishes or starts another attempt."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "default": "Does the current real-robot scene satisfy the task?",
+                },
+            },
+        },
+    },
     *[
         {
             "name": name,
@@ -254,7 +298,7 @@ TOOLS_SPEC = [
                         "minimum": 1,
                         "maximum": 20,
                         "default": 20,
-                    }
+                    },
                 },
                 "required": ["prompt"],
             },
@@ -309,14 +353,17 @@ def _agent_observation_policy(meta: dict[str, Any] | None) -> dict[str, list[str
     auxiliary = raw.get("auxiliary_cameras", ["left_wrist", "base", "right_wrist"])
     return {
         "inline_cameras": [str(item) for item in inline if isinstance(item, str)],
-        "auxiliary_cameras": [
-            str(item) for item in auxiliary if isinstance(item, str)
-        ],
+        "auxiliary_cameras": [str(item) for item in auxiliary if isinstance(item, str)],
     }
 
 
 def _image_bytes_key(index: int) -> str:
-    keys = ["_image_bytes", "_image_cam_bytes", "_image_nav_bytes", "_image_wrist_bytes"]
+    keys = [
+        "_image_bytes",
+        "_image_cam_bytes",
+        "_image_nav_bytes",
+        "_image_wrist_bytes",
+    ]
     return keys[index]
 
 
@@ -694,7 +741,9 @@ def dump_state(
         )
         main_image = observation.get("main_images")
         if main_image is not None:
-            main_alias = _camera_alias_from_key(observation_map.get("main")) or "left_wrist"
+            main_alias = (
+                _camera_alias_from_key(observation_map.get("main")) or "left_wrist"
+            )
             state.save(f"{main_alias}.png", np.asarray(main_image), step=step)
         extra_images = observation.get("extra_view_images")
         if extra_images is not None:
@@ -712,7 +761,9 @@ def dump_state(
                 state.save(f"{alias}.png", np.asarray(image), step=step)
         main_depth = observation.get("main_depths")
         if main_depth is not None:
-            main_alias = _camera_alias_from_key(observation_map.get("main")) or "left_wrist"
+            main_alias = (
+                _camera_alias_from_key(observation_map.get("main")) or "left_wrist"
+            )
             state.save(f"{main_alias}_depth.npy", np.asarray(main_depth), step=step)
         extra_depths = observation.get("extra_view_depths")
         if extra_depths is not None:

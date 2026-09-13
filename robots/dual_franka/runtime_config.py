@@ -73,10 +73,6 @@ RECOVERY = {
 EPISODE_STEPS = 300
 
 DEFAULT_CONFIG = Path(__file__).with_name("config") / "example.yaml"
-# Compatibility with the upstream-main robot_spec naming.  The dual-Franka
-# runtime still owns a distinct packaged config; keep both names pointing at the
-# same file while the main branch finishes converging config-path handling.
-DUAL_FRANKA_CONFIG = DEFAULT_CONFIG
 
 
 def _camera_slot(observation: dict[str, Any], slot: str) -> tuple[list[str], str]:
@@ -126,8 +122,12 @@ def _agent_observation(cameras: dict[str, Any]) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for key in ("inline_cameras", "auxiliary_cameras"):
         value = policy.get(key, default[key])
-        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-            raise ValueError(f"cameras.agent_observation.{key} must be a list of strings")
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) for item in value
+        ):
+            raise ValueError(
+                f"cameras.agent_observation.{key} must be a list of strings"
+            )
         out[key] = [str(item) for item in value]
     return out
 
@@ -138,8 +138,15 @@ def _projection_views(raw: dict[str, Any]) -> dict[str, Any]:
     # projection registry for extra RGBD views that can localize pixels in the
     # shared right_base frame.
     perception = _require_mapping(raw.get("perception"), "perception")
-    views = _require_mapping(perception.get("projection_views"), "perception.projection_views")
-    return {str(alias): dict(_require_mapping(value, f"perception.projection_views.{alias}")) for alias, value in views.items()}
+    views = _require_mapping(
+        perception.get("projection_views"), "perception.projection_views"
+    )
+    return {
+        str(alias): dict(
+            _require_mapping(value, f"perception.projection_views.{alias}")
+        )
+        for alias, value in views.items()
+    }
 
 
 def _joint_health_thresholds(raw: dict[str, Any]) -> dict[str, dict[str, float]]:
@@ -155,9 +162,7 @@ def _joint_health_thresholds(raw: dict[str, Any]) -> dict[str, dict[str, float]]
     )
     out: dict[str, dict[str, float]] = {}
     for arm in ("left", "right"):
-        values = _require_mapping(
-            thresholds.get(arm), f"joint_health.thresholds.{arm}"
-        )
+        values = _require_mapping(thresholds.get(arm), f"joint_health.thresholds.{arm}")
         out[arm] = {str(key): float(value) for key, value in values.items()}
     return out
 

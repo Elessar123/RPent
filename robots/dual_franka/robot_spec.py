@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from robots.dual_franka.prompt_bundle import system_prompt, user_prompt
-from robots.dual_franka.runtime_config import DUAL_FRANKA_CONFIG
+from robots.dual_franka.runtime_config import DEFAULT_CONFIG
 from robots.dual_franka.tasks import DUAL_FRANKA_TASKS, get_dual_franka_task
 from robots.franka.runtime_config import (
     DEFAULT_CALIBRATION_PATH,
@@ -55,7 +55,7 @@ DUAL_FRANKA_DASHBOARD_SPEC: DashboardSpec = {
                 "name": "task_id",
                 "kind": "integer",
                 "minimum": 0,
-                "suggestions": (0, 1),
+                "suggestions": tuple(sorted(DUAL_FRANKA_TASKS)),
             },
         ),
         "display": "Dual Franka task {task_id}",
@@ -93,7 +93,10 @@ DUAL_FRANKA_DASHBOARD_SPEC: DashboardSpec = {
         "rotate_delta",
         "open_gripper",
         "close_gripper",
-        "vla_grasp",
+        "recover_joint_posture",
+        "vla_right_grasp",
+        "vla_handoff",
+        "vla_left_place",
     ),
 }
 
@@ -107,6 +110,7 @@ def get_robot_spec() -> RobotSpec:
         parse_config=_parse_config,
         init_runtime=_init_runtime,
         dashboard=DUAL_FRANKA_DASHBOARD_SPEC,
+        supports_exploration=True,
     )
 
 
@@ -115,17 +119,26 @@ def get_toolkit(
     primitives_kwargs: dict[str, Any],
     dashboard_events: DashboardEventSink,
     config: RunConfig,
+    mode: str = "evaluation",
+    attempts_per_session: int = 0,
+    state_output_dir: Path | str | None = None,
 ):
     """Return the dual-Franka toolkit."""
     from robots.dual_franka.toolkit import DualFrankaToolkit
 
+    explore = mode == "exploration"
     memory = MemoryManager(
         root=config.prompt_vars.get("memory_dir") or get_memory_dir("dual_franka"),
+        memory_access="inbox_write" if explore else "read_only",
+        inbox_cell_tag=config.recipe_tag if explore else None,
     )
     return DualFrankaToolkit(
         primitives_kwargs=primitives_kwargs,
         dashboard_events=dashboard_events,
         memory=memory,
+        mode=mode,
+        attempts_per_session=attempts_per_session,
+        state_output_dir=state_output_dir,
     )
 
 
@@ -164,17 +177,44 @@ def _add_cli_args(parser: argparse.ArgumentParser, use_dashboard: bool) -> None:
         help="Path to hand_eye_calibration.json (defaults to easy_handeye's "
         "~/.ros/easy_handeye directory).",
     )
+    parser.add_argument(
+        "--auto-merge-memory",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Merge exploration output into layered memory. Disabled by default "
+            "for real-robot dual_franka so drafts are reviewed first."
+        ),
+    )
+    parser.add_argument(
+        "--explore-attempts-per-session",
+        type=int,
+        default=3,
+        help="Real-robot exploration attempts per planner session (default: 3).",
+    )
+    parser.add_argument(
+        "--explore-sessions",
+        type=int,
+        default=1,
+        help="Independent planner sessions per real-robot exploration run (default: 1).",
+    )
 
 
 def _parse_config(args: argparse.Namespace) -> RunConfig:
-    set_robot_config_path(args.robot_config or DUAL_FRANKA_CONFIG)
+    set_robot_config_path(args.robot_config or DEFAULT_CONFIG)
     if args.task_id is None:
         raise ValueError("--task-id is required")
     task = get_dual_franka_task(args.task_id)
+    explore = bool(getattr(args, "explore", False))
     timestamp = datetime.now().strftime("%Y%m%d-%H:%M:%S")
     output_dir = Path(
         args.output_dir
         or get_repo_root() / "logs" / f"{timestamp}_dual_franka_t{args.task_id}"
+    )
+    memory_dir = (
+        Path(args.memory_dir).expanduser().resolve()
+        if getattr(args, "memory_dir", None)
+        else get_memory_dir("dual_franka")
     )
     constraints = "\n".join(
         f"{index}. {constraint}" for index, constraint in enumerate(task.constraints, 1)
@@ -188,6 +228,17 @@ def _parse_config(args: argparse.Namespace) -> RunConfig:
             "setup": getattr(task, "setup", ""),
             "success_criteria": task.success_criteria,
             "constraints": constraints,
+            "recipe_tag": f"dual_franka_t{args.task_id}",
+            "mode": "explore" if explore else "eval",
+            "memory_profile": getattr(args, "memory_profile", None),
+            "memory_dir": str(memory_dir),
+            "memory_inbox": str(
+                memory_dir / "_internal" / "inbox" / f"dual_franka_t{args.task_id}"
+            ),
+            "session_number": 1,
+            "session_max": max(1, getattr(args, "explore_sessions", 1))
+            if explore
+            else 1,
         },
         task_desc={"task_id": args.task_id, "task_name": task.name},
     )

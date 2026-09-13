@@ -205,9 +205,7 @@ def fake_rlinf_realworld_modules(monkeypatch: pytest.MonkeyPatch) -> None:
         "rlinf.envs.realworld.franka.franka_env": _fake_module(
             "rlinf.envs.realworld.franka.franka_env",
             FrankaEnv=FakeFrankaEnv,
-            FrankaRobotConfig=dataclass_for(
-                "FrankaRobotConfig", franka_robot_fields
-            ),
+            FrankaRobotConfig=dataclass_for("FrankaRobotConfig", franka_robot_fields),
         ),
         "rlinf.envs.realworld.franka.tasks": _fake_module(
             "rlinf.envs.realworld.franka.tasks", __path__=[]
@@ -231,9 +229,7 @@ def fake_rlinf_realworld_modules(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         "rlinf.scheduler.hardware.robots.dual_franka": _fake_module(
             "rlinf.scheduler.hardware.robots.dual_franka",
-            DualFrankaConfig=dataclass_for(
-                "DualFrankaConfig", dual_hardware_fields
-            ),
+            DualFrankaConfig=dataclass_for("DualFrankaConfig", dual_hardware_fields),
         ),
     }
     for name, module in modules.items():

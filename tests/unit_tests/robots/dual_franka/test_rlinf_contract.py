@@ -68,7 +68,9 @@ def test_hardware_keys_are_valid_rlinf_fields(fake_rlinf_realworld_modules):
     assert not unknown, f"hardware keys not in DualFrankaConfig: {unknown}"
 
 
-def test_controller_carries_calibration_path_for_ray_worker(fake_rlinf_realworld_modules):
+def test_controller_carries_calibration_path_for_ray_worker(
+    fake_rlinf_realworld_modules,
+):
     from robots.dual_franka.runtime_config import load_runtime_config
     from robots.franka.runtime_config import set_calibration_path
 

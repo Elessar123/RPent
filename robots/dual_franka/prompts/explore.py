@@ -26,7 +26,9 @@ MODE = (
 RULES = (
     "This is a physical robot, not simulation. Never assume the environment "
     "has been automatically reset. If a new attempt needs a restored tabletop "
-    "scene, call request_scene_reset and wait for the operator's confirmation.",
+    "scene, call request_scene_reset, wait for the operator to remove/secure "
+    "held objects and restore the scene, then let the tool reset the robot's "
+    "own posture.",
     "Before ending an exploration run, call request_operator_verdict so the "
     "human operator can mark whether the real task state is success, failure, "
     "or needs more action.",
@@ -49,7 +51,8 @@ WORKFLOW = (
     "between attempts, such as the selected D455 pixel, SAM3 prompt, staging "
     "height, or VLA segment boundary usage.",
     "If the scene must be restored between attempts, call request_scene_reset; "
-    "after the operator confirms, re-run perception before any motion.",
+    "after the operator confirms and the tool resets the robot posture, re-run "
+    "perception before any motion.",
     "If the task appears complete or safely stopped, call request_operator_verdict "
     "before finish. If the operator asks you to continue, keep acting or reset "
     "according to the returned instruction.",

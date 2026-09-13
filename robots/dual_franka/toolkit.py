@@ -116,7 +116,7 @@ class DualFrankaToolkit(FrankaToolkit):
         reason: str,
         expected_scene_state: str = "",
     ) -> dict[str, Any]:
-        """Pause a real-robot exploration attempt until the operator restores it."""
+        """Pause until the operator makes reset safe, then reset robot posture."""
         budget = self._attempts_per_session
         if budget and self._session_attempt >= budget:
             return {
@@ -134,9 +134,12 @@ class DualFrankaToolkit(FrankaToolkit):
         print(f"reason: {reason}")
         if expected_scene_state:
             print(f"expected scene: {expected_scene_state}")
-        print("Restore the real tabletop scene, then type 'done' to continue.")
+        print(
+            "Remove/secure any held objects and restore the real tabletop scene, "
+            "then type 'done' to let the robot reset its own posture."
+        )
         response = self._read_operator_line(
-            "operator reset confirmation [done/abort]: "
+            "operator scene-safe confirmation [done/abort]: "
         )
         if response is None:
             return {
@@ -155,6 +158,8 @@ class DualFrankaToolkit(FrankaToolkit):
                 "attempt": self._attempt,
             }
 
+        self.raise_if_cancelled()
+        robot_reset = self._primitives.reset()
         self._attempt += 1
         self._session_attempt += 1
         self._operator_verdict = None
@@ -165,10 +170,12 @@ class DualFrankaToolkit(FrankaToolkit):
             "attempt": self._attempt,
             "session_attempt": self._session_attempt,
             "attempts_per_session": budget,
+            "robot_reset": robot_reset,
             "notice": (
-                "Operator confirmed the real scene was restored. Re-run "
-                "perception before any motion; no simulator-style env reset "
-                "was performed."
+                "Operator confirmed the physical scene was safe/restored, then "
+                "the robot reset its own posture. Re-run perception before any "
+                "motion; the tabletop scene was restored by the operator, not "
+                "by a simulator-style environment reset."
             ),
         }
 

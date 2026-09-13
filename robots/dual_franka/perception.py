@@ -234,15 +234,11 @@ def segment(
         "rejection_reasons": segment_blob.get("rejection_reasons"),
         "left_tcp_xyz": segment_blob.get("left_tcp_xyz"),
         "right_tcp_xyz": segment_blob.get("right_tcp_xyz"),
-        "delta_left_tcp_to_point_xyz": segment_blob.get(
-            "delta_left_tcp_to_point_xyz"
-        ),
+        "delta_left_tcp_to_point_xyz": segment_blob.get("delta_left_tcp_to_point_xyz"),
         "delta_right_tcp_to_point_xyz": segment_blob.get(
             "delta_right_tcp_to_point_xyz"
         ),
-        "tcp_delta_coordinate_frame": segment_blob.get(
-            "tcp_delta_coordinate_frame"
-        ),
+        "tcp_delta_coordinate_frame": segment_blob.get("tcp_delta_coordinate_frame"),
         "tcp_delta_contract": segment_blob.get("tcp_delta_contract"),
         "selection_contract": segment_blob["selection_contract"],
     }
@@ -548,7 +544,9 @@ def _record_tcp_frame(
     frame = arm_state.get("tcp_pose_frame") or arm_state.get("coordinate_frame")
     if isinstance(frame, str) and frame:
         return frame
-    state_frame = record_state.get("coordinate_frame") if isinstance(record_state, dict) else None
+    state_frame = (
+        record_state.get("coordinate_frame") if isinstance(record_state, dict) else None
+    )
     if isinstance(state_frame, str) and state_frame:
         return state_frame
     return "right_base" if arm == "right" else "left_base"
@@ -714,10 +712,10 @@ def _save_back_project_diagnostic(
     label_y = max(20, row - 14)
     draw.text((label_x, label_y), label, fill=color)
 
-    annotated_artifact = f"{camera_alias}_back_project_{artifact_index:02d}_annotated.png"
-    annotated_name = state.save(
-        annotated_artifact, np.asarray(image), step=step_idx
+    annotated_artifact = (
+        f"{camera_alias}_back_project_{artifact_index:02d}_annotated.png"
     )
+    annotated_name = state.save(annotated_artifact, np.asarray(image), step=step_idx)
     if annotated_name is None:
         raise DualFrankaPerceptionError("failed to save annotated image")
     annotated_path = state.artifact_path(annotated_name, step=step_idx)

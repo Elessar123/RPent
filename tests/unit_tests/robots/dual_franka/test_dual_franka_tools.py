@@ -41,12 +41,14 @@ from rpent.tools.toolkit import ToolResult
 
 class FakeEnv:
     def __init__(self) -> None:
+        self.resets = 0
         self.moves: list[tuple[str, np.ndarray]] = []
         self.rotations: list[tuple[str, np.ndarray]] = []
         self.grippers: list[tuple[str, bool]] = []
         self.chunks: list[np.ndarray] = []
 
     def reset(self):
+        self.resets += 1
         return {"ok": True}
 
     def move_delta(self, arm, value):
@@ -233,6 +235,40 @@ def test_toolkit_exploration_tools_are_opt_in(tmp_path: Path):
     )
     assert accepted.is_finish is True
     assert accepted.result["operator_verdict"] == "success"
+
+
+def test_scene_reset_waits_for_operator_then_resets_robot(tmp_path: Path):
+    env = FakeEnv()
+    exploration = DualFrankaToolkit(
+        primitives_kwargs={
+            "env": env,
+            "model": None,
+            "task_description": "default task",
+        },
+        dashboard_events=NullDashboardEventSink(),
+        memory=MemoryManager(
+            tmp_path / "explore-memory",
+            memory_access="inbox_write",
+            inbox_cell_tag="dual_franka_t4",
+        ),
+        mode="exploration",
+        attempts_per_session=2,
+        state_output_dir=tmp_path / "explore-state",
+    )
+    exploration._read_operator_line = lambda prompt: "done"
+
+    result = exploration.execute_tool(
+        "request_scene_reset",
+        {
+            "reason": "retry with restored layout",
+            "expected_scene_state": "objects back at the starting positions",
+        },
+    ).result
+
+    assert env.resets == 1
+    assert result["result"]["robot_reset"] == {"ok": True}
+    assert result["result"]["attempt"] == 2
+    assert "robot reset its own posture" in result["result"]["notice"]
 
 
 def test_arm_and_vec3_validation_and_motion_forwarding():

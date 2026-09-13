@@ -12,6 +12,7 @@
 
 model = "gpt-5.5"
 model_reasoning_effort = "medium"
+service_tier = "fast"
 
 # Keep robot-control Codex sessions conservative by default. RPent's Codex
 # planner talks to RPent tools through an in-process MCP server; this file is

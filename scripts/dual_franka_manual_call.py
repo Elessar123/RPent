@@ -304,7 +304,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _load_payload(args: argparse.Namespace) -> dict[str, Any]:
     if not args.primitive:
-        raise ValueError("provide --primitive, --schema, --example, or --list-primitives")
+        raise ValueError(
+            "provide --primitive, --schema, --example, or --list-primitives"
+        )
     payload = {"primitive": args.primitive, "params": json.loads(args.params)}
     primitive = payload.get("primitive")
     params = payload.get("params", {})
@@ -445,7 +447,9 @@ def main() -> int:
     params = payload["params"]
     if args.calibration_path:
         set_calibration_path(args.calibration_path)
-    output_dir = Path(args.output_dir) if args.output_dir else _default_output_dir(primitive)
+    output_dir = (
+        Path(args.output_dir) if args.output_dir else _default_output_dir(primitive)
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     env_rpc = make_rpc_client(args.env_endpoint)
@@ -530,13 +534,15 @@ def main() -> int:
                 "state_dump_error": f"{type(exc).__name__}: {exc}",
             }
 
-    out = _strip_for_json({
-        "primitive": primitive,
-        "params": params,
-        "elapsed_s": elapsed_s,
-        "output_dir": str(output_dir),
-        "result": result,
-    })
+    out = _strip_for_json(
+        {
+            "primitive": primitive,
+            "params": params,
+            "elapsed_s": elapsed_s,
+            "output_dir": str(output_dir),
+            "result": result,
+        }
+    )
     result_path = output_dir / "result.json"
     result_path.write_text(json.dumps(out, indent=2, default=_json_default))
     print(json.dumps(out, indent=2, default=_json_default))

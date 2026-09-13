@@ -237,9 +237,9 @@ TOOLS_SPEC = [
         "name": "request_scene_reset",
         "description": (
             "Exploration-only real-robot reset gate. Ask the human operator to "
-            "restore the tabletop scene for another attempt, then wait for the "
-            "operator to confirm in the runner terminal. This does not "
-            "automatically reset the physical environment like a simulator."
+            "remove/secure held objects and restore the tabletop scene for another "
+            "attempt, wait for terminal confirmation, then reset the robot posture. "
+            "This does not automatically restore physical objects like a simulator."
         ),
         "input_schema": {
             "type": "object",

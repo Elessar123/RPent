@@ -4,9 +4,57 @@ This file records RPent modifications made during live dual-Franka debugging so
 they can be reviewed later. New RPent code/config changes should append an entry
 here with the intent, touched files, validation, and any runtime caveats.
 
+## 2026-09-13 — rebase live dual-Franka changes onto upstream main
+
+Status: migrated onto `upstream/main` as branch
+`nieyi/dual-franka-live-alignment-main`; not pushed yet.
+
+Context:
+
+- `RLinf/RPent:main` already contains a squashed/reworked Franka integration,
+  so the live-tested branch could not be treated as a small linear patch over
+  main.
+- The migration intentionally kept the live-tested dual-Franka behavior for
+  safety-critical runtime pieces, then re-applied main-side compatibility where
+  the conflict was unambiguous.
+
+Migration choices:
+
+- Preserved the main-branch client state cache while adding
+  `recover_joint_posture` to `DualFrankaEnvClient`.
+- Kept the main-branch single-Franka toolkit initialization behavior: no
+  additional primitive reset is injected during toolkit construction.
+- Added a compatibility `DUAL_FRANKA_CONFIG = DEFAULT_CONFIG` alias while the
+  main branch and live branch finish converging on config-path naming.
+- Added a `_to_numpy_tree` compatibility alias in `robots/franka/env_server.py`
+  so dual-Franka can share the port/franka serialization helper name without
+  rewriting the single-arm server in this migration.
+- Reworked Franka/dual-Franka config contract tests to use inert fake RLinf
+  dataclass modules; importing real RLinf realworld packages can touch ROS/Ray
+  processes on lab machines and is not appropriate for unit tests.
+
+Validation:
+
+- `python -m pytest tests/unit_tests/robots/dual_franka tests/unit_tests/robots/franka -q`
+  passed: 27 passed.
+- `python -m pytest tests/unit_tests/rpent/robots tests/unit_tests/robots/test_toolkit_contracts.py tests/unit_tests/rpent/tools/test_toolkit_contracts.py tests/unit_tests/rpent/cli/test_main_contracts.py -q`
+  passed: 70 passed.
+- Full `tests/unit_tests` run reached 418 passed and 2 unrelated flywheel
+  failures because this environment has a top-level `lerobot` package without
+  `lerobot.datasets`; no dual-Franka/franka failure remained.
+
+Caveats:
+
+- Real-robot execution on this main-based branch has not yet been rerun after
+  migration. The migrated code retains the previously live-tested behavior, but
+  final confidence still requires the usual real-machine sequence: manual skill
+  smoke, VLA segment smoke, then task 3 dirty/clean sort.
+- The exploration candidate task from the previous local branch was
+  intentionally not migrated into this PR branch.
+
 ## 2026-09-10 — dual-Franka live deployment fixes and SAM3 integration
 
-Status: local working tree changes, not yet committed/pushed.
+Status: live-tested changes; migrated onto upstream main on 2026-09-13.
 
 Context:
 
@@ -55,9 +103,7 @@ Main changes currently present in the RPent working tree:
 4. Prompt/task alignment for clean-desk VLA execution
 
    - Registered named clean-desk VLA tools:
-     `vla_right_grasp`, `vla_right_grasp`, `vla_right_grasp`,
-     `vla_right_grasp`, `vla_right_grasp`, `vla_handoff`,
-     `vla_left_place`.
+     `vla_right_grasp`, `vla_handoff`, `vla_left_place`.
    - Prompts/tasks emphasize category order, D455 verification, cardboard-box
      versus metal-basket disambiguation, and VLA segment boundary checks.
    - Main files:

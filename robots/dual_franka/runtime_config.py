@@ -73,6 +73,10 @@ RECOVERY = {
 EPISODE_STEPS = 300
 
 DEFAULT_CONFIG = Path(__file__).with_name("config") / "example.yaml"
+# Compatibility with the upstream-main robot_spec naming.  The dual-Franka
+# runtime still owns a distinct packaged config; keep both names pointing at the
+# same file while the main branch finishes converging config-path handling.
+DUAL_FRANKA_CONFIG = DEFAULT_CONFIG
 
 
 def _camera_slot(observation: dict[str, Any], slot: str) -> tuple[list[str], str]:

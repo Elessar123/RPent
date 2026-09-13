@@ -19,8 +19,6 @@ from __future__ import annotations
 import dataclasses
 from pathlib import Path
 
-import pytest
-
 # Keys RPent builds into ``env.eval.override_cfg`` and the ``DualFranka``
 # hardware config. Kept here (not a runtime constant) so this test doubles as
 # the authoritative drift guard.
@@ -52,8 +50,7 @@ _HARDWARE_KEYS = {
 }
 
 
-def test_override_keys_are_valid_rlinf_fields():
-    pytest.importorskip("rlinf.envs.realworld.franka.tasks.dual_franka_tcp_env")
+def test_override_keys_are_valid_rlinf_fields(fake_rlinf_realworld_modules):
     from rlinf.envs.realworld.franka.tasks.dual_franka_tcp_env import (
         DualFrankaTCPRobotConfig,
     )
@@ -63,8 +60,7 @@ def test_override_keys_are_valid_rlinf_fields():
     assert not unknown, f"override keys not in DualFrankaTCPRobotConfig: {unknown}"
 
 
-def test_hardware_keys_are_valid_rlinf_fields():
-    pytest.importorskip("rlinf.scheduler.hardware.robots.dual_franka")
+def test_hardware_keys_are_valid_rlinf_fields(fake_rlinf_realworld_modules):
     from rlinf.scheduler.hardware.robots.dual_franka import DualFrankaConfig
 
     valid = {field.name for field in dataclasses.fields(DualFrankaConfig)}
@@ -72,9 +68,7 @@ def test_hardware_keys_are_valid_rlinf_fields():
     assert not unknown, f"hardware keys not in DualFrankaConfig: {unknown}"
 
 
-def test_controller_carries_calibration_path_for_ray_worker():
-    pytest.importorskip("rlinf.envs.realworld.franka.tasks.dual_franka_tcp_env")
-    pytest.importorskip("rlinf.scheduler.hardware.robots.dual_franka")
+def test_controller_carries_calibration_path_for_ray_worker(fake_rlinf_realworld_modules):
     from robots.dual_franka.runtime_config import load_runtime_config
     from robots.franka.runtime_config import set_calibration_path
 

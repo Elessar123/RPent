@@ -18,8 +18,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from robots.dual_franka import get_robot_spec
 from robots.dual_franka.runtime_config import load_runtime_config
 from robots.dual_franka.tasks import CLEAN_DESK_VLA_PROMPT, DUAL_FRANKA_TASKS
@@ -38,8 +36,7 @@ def test_dual_franka_extension_is_discoverable():
     assert "d455" in frame_channels
 
 
-def test_dual_franka_uses_rpent_owned_robot_config():
-    pytest.importorskip("rlinf.envs.realworld.franka.franka_env")
+def test_dual_franka_uses_rpent_owned_robot_config(fake_rlinf_realworld_modules):
     config_path = Path(__file__).parents[4] / "robots/dual_franka/config/example.yaml"
     runtime = load_runtime_config(None, task_description="test task")
     cfg = runtime.rlinf

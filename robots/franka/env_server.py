@@ -34,6 +34,12 @@ from rpent.utils.serialization import to_numpy_tree
 
 logger = get_logger("franka_env_server")
 
+# Dual-Franka imports the helper by this private name after the port/franka
+# serialization refactor.  Keep main's existing implementation and expose the
+# compatibility alias instead of rewriting the single-arm server in this
+# migration.
+_to_numpy_tree = to_numpy_tree
+
 
 class FrankaEnvFacade(BaseEnvFacade):
     """Expose the single-Franka ``env.*`` protocol from a Ray-backed worker."""

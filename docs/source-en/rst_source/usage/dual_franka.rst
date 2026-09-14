@@ -203,3 +203,61 @@ Keep operators at both emergency stops. Validate task ``0`` with very small
 single-arm motions before attempting a grasp. Stop when camera/state results
 disagree, when the requested motion is not reached, or when any calibration is
 uncertain.
+
+Attended exploration
+--------------------
+
+``dual_franka --explore`` supports the operator workflow from PR #176. It reuses
+RPent's exploration sessions and layered memory while retaining the existing
+real-robot RGB/depth/state logs. This does not enable single-arm ``franka``
+exploration.
+
+.. code-block:: bash
+
+   rpent --robot dual_franka --task-id 0 --explore --interactive \
+     --robot-config /path/to/robot.yaml \
+     --calibration-path /path/to/hand_eye_calibration.json \
+     --memory-dir /path/to/memory/dual_franka \
+     --explore-attempts-per-session 3 --explore-sessions 2 \
+     --output-dir /path/to/new-run
+
+Configure the planner and task-1 VLA as described above. The client skips its
+usual reset-on-connect during exploration; underlying hardware initialization
+still follows RLinf's own lifecycle. Every session must call
+``request_scene_reset`` before motion. The operator restores the physical scene
+and replies ``done``; only a successful robot reset with camera/state capture
+starts an attempt. Reset failures keep motion blocked.
+
+``request_operator_verdict`` records a fresh observation and asks for
+``success``, ``failure``, ``continue`` or ``abort``, with optional notes.
+``solved()`` uses the current operator verdict. Motion and ``continue`` clear
+previous verdicts. Abort/EOF permits ending without spending the remaining
+attempt budget.
+
+With ``--interactive``, reply using ``/operator <request-id> <answer>`` as shown
+in the terminal; other lines remain planner steering. Without it, answer the
+terminal prompt directly. A TTY is required. Dashboard operator feedback is not
+implemented, so Dashboard exploration is rejected before runtime startup.
+
+Each ``sessions/session_<NNN>/`` retains the existing artifacts plus per-step
+``exploration.json`` and session-level ``operator_events.json``. Failed attempts
+remain in the trace. Memory reads use ``suite`` and ``global``; working notes go
+into the task inbox's ``wip/``. After success, draft suite/global lessons in the
+inbox; the runner exports the winning attempt's command sequence and adds
+operator evidence to its task audit. Recorded coordinates are not automatically
+replayed. ``--auto-merge-memory`` is opt-in and invokes the existing memory
+merge/index workflow only on successful, error-free exploration runs, including
+the ``task_only`` audit/recipe pair.
+
+Prompts are selected by ``robots/dual_franka/prompt_bundle.py``. Evaluation uses
+``prompts/system.py`` and ``prompts/user.py``; exploration uses
+``prompts/explore.py``. ``tasks.py`` owns task instructions, success criteria and
+constraints; ``robot_spec.py`` supplies the rendering variables. Continuation
+system prompts retain the task context. The original LIBERO exploration prompt
+lives in ``robots/libero/prompts/explore.py``; its simulator reset/termination
+assumptions are not inherited by the real robot.
+
+External ``--env-endpoint`` servers must also be updated and advertise
+``explicit_reset_only=True``; older servers are rejected before client reset.
+Offline tests use fake hardware. Physical reset convergence, camera freshness
+and task judgment still require validation on the deployed robot.

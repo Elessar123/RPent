@@ -46,6 +46,7 @@ class FrankaToolkit(Toolkit):
         memory: MemoryManager,
         state_output_dir: Path | str | None = None,
     ) -> None:
+        primitives_kwargs = dict(primitives_kwargs)
         state = EnvState(Path(state_output_dir or get_output_dir()))
         super().__init__(
             dashboard_events=dashboard_events,

@@ -160,6 +160,7 @@ def _create_worker_class():
                 "per_arm_dim": self.per_arm_dim,
                 "action_scale": self.action_scale.tolist(),
                 "arms": ["left", "right"],
+                "explicit_reset_only": True,
                 "perception_cameras": sorted(self._perception_cameras),
                 "agent_observation": self.controller.get("agent_observation", {}),
                 "projection_views": self.controller.get("projection_views", {}),
@@ -206,6 +207,10 @@ def _create_worker_class():
             return array
 
         def get_observation(self) -> dict[str, Any]:
+            # Read without stepping/resetting: startup and operator verdicts must
+            # see the current scene, not the cached preceding VLA observation.
+            self._refresh_robot_state()
+            self._refresh_wrapped_observation()
             observation = self._ensure_obs()
             output = {
                 key: self._strip_batch(value) for key, value in observation.items()

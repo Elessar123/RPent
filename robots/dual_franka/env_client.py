@@ -21,6 +21,7 @@ from typing import Any
 import numpy as np
 
 from robots.franka.env_client import FrankaEnvClient
+from rpent.utils.rpc import RpcClient
 
 _MOTION_TIMEOUT_S = 120.0
 _RECOVERY_TIMEOUT_S = 240.0
@@ -28,6 +29,16 @@ _RECOVERY_TIMEOUT_S = 240.0
 
 class DualFrankaEnvClient(FrankaEnvClient):
     """Remote client for one RLinf-backed dual-Franka environment."""
+
+    def __init__(self, client: RpcClient, *, reset_on_connect: bool = True) -> None:
+        super().__init__(client, reset_on_connect=False)
+        if not reset_on_connect and self.meta.get("explicit_reset_only") is not True:
+            raise RuntimeError(
+                "dual-Franka exploration requires an env server advertising "
+                "explicit_reset_only=True; upgrade/restart the external server"
+            )
+        if reset_on_connect:
+            self.reset()
 
     def move_delta(
         self, arm: str, delta_xyz: np.ndarray | list[float]

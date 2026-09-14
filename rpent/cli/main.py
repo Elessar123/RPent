@@ -319,6 +319,10 @@ def _start_continuation_session(
         session_max,
         robot_name=args.robot_name,
     )
+    if args.robot_name == "dual_franka" and prompt_vars.get("initial_user_message"):
+        session_message += "\n\nOriginal operator task instruction:\n" + str(
+            prompt_vars["initial_user_message"]
+        )
     return planner, system_prompt, session_message
 
 
@@ -359,6 +363,17 @@ def main() -> int:
         )
     if args.explore and not getattr(robot_spec, "supports_exploration", False):
         parser.error(f"--explore is not supported for robot {args.robot_name!r}")
+    if args.explore and getattr(args, "explore_attempts_per_session", 0) < 0:
+        parser.error("--explore-attempts-per-session must be nonnegative")
+    if args.explore and args.robot_name == "dual_franka":
+        if args.dashboard:
+            parser.error(
+                "dual_franka exploration currently requires the CLI operator terminal; Dashboard feedback is not implemented"
+            )
+        if sys.stdin is None or not sys.stdin.isatty():
+            parser.error(
+                "dual_franka exploration requires a TTY for operator reset/verdict feedback"
+            )
     if args.explore and args.memory_profile == "hf":
         parser.error("--explore cannot be used with --memory-profile hf")
     if args.explore and getattr(args, "explore_sessions", 1) <= 0:
@@ -422,13 +437,29 @@ def main() -> int:
         variables=prompt_vars,
     )
 
+    operator_input = None
+    if args.explore and robot_name == "dual_franka":
+        from rpent.cli.operator_input import OperatorInput
+
+        operator_input = OperatorInput(interactive=args.interactive)
     input_queue: "queue.Queue[str | None] | None" = None
     await_first_prompt: "Callable[[], str | None] | None" = None
     if args.interactive:
         input_queue = queue.Queue()
         # Pre-fill the first prompt with the rendered default task (editable
         # preset);
-        start_interactive_reader(input_queue, first_prompt_default=user_msg)
+        start_interactive_reader(
+            input_queue,
+            first_prompt_default=user_msg,
+            **(
+                {
+                    "line_handler": operator_input.route_line,
+                    "on_close": operator_input.close,
+                }
+                if operator_input is not None
+                else {}
+            ),
+        )
         logger.info(
             "interactive mode on: the built-in task is pre-filled — "
             "edit it and press Enter, submit it as-is, or clear it to "
@@ -457,6 +488,8 @@ def main() -> int:
         first_user_msg = await_first_prompt()
         if first_user_msg is None:
             logger.info("no task entered; ending session before start.")
+    if args.explore and robot_name == "dual_franka":
+        prompt_vars = {**prompt_vars, "initial_user_message": first_user_msg}
     # Exploration may hand off between independent planner contexts.
     sessions = max(1, int(getattr(args, "explore_sessions", 1) or 1))
     if not getattr(args, "explore", False):
@@ -499,6 +532,11 @@ def main() -> int:
                         args, "explore_attempts_per_session", 0
                     ),
                     state_output_dir=state_output_dir,
+                    **(
+                        {"operator_input": operator_input}
+                        if operator_input is not None
+                        else {}
+                    ),
                 )
             else:
                 toolkit = get_toolkit(
@@ -538,7 +576,7 @@ def main() -> int:
                         solved = bool(environment_success)
                 finally:
                     toolkit.close()
-            if solved:
+            if solved or (finish_result or {}).get("operator_aborted"):
                 break
             if agent_error:
                 if (
@@ -557,6 +595,8 @@ def main() -> int:
         agent_error = f"{type(exc).__name__}: {exc}"
         logger.error("EXCEPTION in agent loop: %s", agent_error)
     finally:
+        if operator_input is not None:
+            operator_input.close()
         if recipe_path:
             logger.info("recipe: %s", recipe_path)
         else:
@@ -620,6 +660,7 @@ def main() -> int:
         and getattr(args, "auto_merge_memory", False)
         and not agent_error
         and memory_manager is not None
+        and (robot_name != "dual_franka" or solved)
     ):
         try:
             merge_result = memory_manager.merge_memory(

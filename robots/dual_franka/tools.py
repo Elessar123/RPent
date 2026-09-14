@@ -264,7 +264,7 @@ TOOLS_SPEC = [
         "name": "request_operator_verdict",
         "description": (
             "Exploration-only human feedback gate. Ask the operator to mark "
-            "the current physical task state as success, failure, or continue "
+            "the current physical task state as success, failure, continue, or abort "
             "before the planner finishes or starts another attempt."
         ),
         "input_schema": {

@@ -23,7 +23,7 @@ task/swap；每个任务 10 个 seed）上，Task Card 成功 581 次（72.63%�
 成功 628 次（78.50%）。两个没有成功源轨迹、因而没有 Task Card 的任务
 按 0/10 保守计入。
 
-.. image:: ../../_static/task_card_libero_pro_performance_time.png
+.. image:: https://github.com/RLinf/misc/raw/main/rpent/task_card/task_card_libero_pro_performance_time.png
    :alt: Task Card 与 Codex 在 LIBERO-PRO 全系列上的逐任务成功率和执行时间对比
    :width: 100%
    :align: center
@@ -74,7 +74,7 @@ episode audit JSON 和与之匹配的 primitive recipe JSONL：
 
    python -m robots.libero.task_card.generate \
      --audit results/goal_swap_t3_s7.json \
-     --recipe results/recipe_goal_swap_t3_s7.jsonl \
+     --recipe results/goal_swap_t3_s7_recipe.jsonl \
      --destination memory/libero/task_card
 
 audit 必须包含非空的 ``task_language``（或 ``perturbed_task_language``）以及

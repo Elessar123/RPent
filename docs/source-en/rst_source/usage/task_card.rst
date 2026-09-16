@@ -26,7 +26,7 @@ without reasoning solved 500 (62.50%), while Codex with high reasoning solved
 628 (78.50%). The two tasks without a successful source trace and therefore no
 Task Card are conservatively counted as 0/10.
 
-.. image:: ../../_static/task_card_libero_pro_performance_time.png
+.. image:: https://github.com/RLinf/misc/raw/main/rpent/task_card/task_card_libero_pro_performance_time.png
    :alt: Per-task success rate and execution-time comparison between Task Card and Codex on all LIBERO-PRO suites
    :width: 100%
    :align: center
@@ -87,7 +87,7 @@ recipe JSONL:
 
    python -m robots.libero.task_card.generate \
      --audit results/goal_swap_t3_s7.json \
-     --recipe results/recipe_goal_swap_t3_s7.jsonl \
+     --recipe results/goal_swap_t3_s7_recipe.jsonl \
      --destination memory/libero/task_card
 
 The audit must contain a non-empty ``task_language`` (or

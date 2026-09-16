@@ -358,7 +358,7 @@ def generate_task_card(
     recipe_path = Path(recipe_path)
     destination = Path(destination)
     identity = _identity(audit_path)
-    expected_recipe = f"recipe_{identity.tag}.jsonl"
+    expected_recipe = f"{identity.tag}_recipe.jsonl"
     if recipe_path.name != expected_recipe:
         raise ValueError(
             f"recipe filename {recipe_path.name!r} does not match audit; "

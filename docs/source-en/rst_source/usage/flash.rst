@@ -1,17 +1,21 @@
 Flash Mode
 ==========
 
-**Flash Mode** is an evaluation-only execution mode that replays a plan stored
-in memory. Each plan is derived from a simulator-verified successful episode
-and contains an action sequence and visual anchors. During evaluation, RPent
-locates those anchors in the current scene and adjusts the recorded waypoints.
-It does not call an LLM to plan actions; SAM3, Molmo, and the VLA still perform
-perception and low-level execution.
+A **Flash plan** stores the action sequence for a LIBERO task and marks the key
+objects or locations needed by those actions. During replay, RPent finds their
+current coordinates in the camera images, updates the action coordinates, and
+executes the recorded actions in order.
 
-Select Flash Mode with ``--planner flash``. RPent evaluates by default;
-combining Flash Mode with ``--explore`` is rejected before services start.
-The current implementation supports LIBERO-PRO Spatial, Object, Goal, and Long
-(``10``), across the task and swap suites.
+This keeps planning and perception separate:
+
+1. The Flash plan decides **what to do**.
+2. SAM3 or Molmo finds **where to do it** in the current scene.
+3. The LIBERO toolkit executes the actions at the updated coordinates.
+
+``--planner flash`` therefore does not call an LLM to make planning
+decisions. Molmo is used only for visual localization: it points to a requested
+object or location in a camera image so RPent can recover its current
+coordinates.
 
 LIBERO-PRO performance and execution time
 -----------------------------------------
@@ -37,7 +41,7 @@ cases.
 How replay works
 ----------------
 
-Each Flash plan contains an action sequence and a set of anchors. An anchor describes a
+Each plan contains an action plan and a set of anchors. An anchor describes a
 task-relevant object or location, such as the object to pick or the destination
 for a placement. Actions that depend on an anchor store their offset from that
 anchor instead of relying only on an absolute coordinate.
@@ -54,16 +58,17 @@ RPent then combines each live anchor position with the offset stored in the
 plan and executes the resulting waypoint. This lets the same plan run when
 objects appear at different positions.
 
-Flash plans in memory
----------------------
+Flash plan files
+----------------
 
-Flash plans are distributed through the `RLinf/RPent-memory Flash Mode directory
+Flash plans are distributed through the `RLinf/RPent-memory Flash directory
 <https://huggingface.co/datasets/RLinf/RPent-memory/tree/main/libero/flash>`_
-on Hugging Face rather than tracked in Git. With ``--memory-profile hf``
-(the evaluation default), RPent synchronizes ``libero/flash/**`` into
-``memory/libero/flash`` before execution.
-The corpus contains 78 plans for 80 task identities. ``goal_swap_t0`` and
-``10_swap_t9`` have no successful source plan and cannot use Flash Mode.
+on Hugging Face rather than tracked in Git. RPent downloads them in HF memory
+mode and stores them locally under ``memory/libero/flash``. With
+``--memory-profile local --memory-dir /path/to/memory/libero``, it reads plans from
+``/path/to/memory/libero/flash`` without downloading data.
+There are 78 plans for 80 task identities; ``goal_swap_t0`` and ``10_swap_t9``
+have no plan. Missing plan or anchor files cause an error.
 
 .. code-block:: text
 
@@ -97,7 +102,7 @@ If ``segment_*.json`` readings were saved for the episode, pass their directory
 with ``--segments``. Otherwise the generator derives semantic Molmo anchors from
 the instruction and the recipe's ordered pick/release or articulation
 transactions. Nearby ``move_to`` and ``move_pose`` coordinates are stored as XY
-offsets from those anchors, in the format consumed by Flash Mode replay.
+offsets from those anchors, in the format consumed by Flash replay.
 
 The relation parser supports all 80 LIBERO-PRO tasks: Spatial, Object, Goal, and
 Long (``10``), across both task and swap suites. Long instructions are preserved
@@ -111,10 +116,12 @@ To download only the Flash plans manually, run:
    hf download RLinf/RPent-memory --repo-type dataset \
      --include "libero/flash/**" --local-dir memory
 
-Evaluate with Flash Mode
-------------------------
+Run Flash Mode
+--------------
 
-Start Molmo first, then pass its endpoint to RPent:
+Flash Mode is for evaluation only and cannot be combined with ``--explore``.
+It replays a prepared plan from memory. Start Molmo first, then pass its
+endpoint to RPent:
 
 .. code-block:: bash
 
@@ -123,29 +130,11 @@ Start Molmo first, then pass its endpoint to RPent:
      --molmo-endpoint http://127.0.0.1:20703
 
 Flash replay supports the task and swap suites for LIBERO-PRO Spatial,
-Object, Goal, and Long (``10``), for 80 task identities in total; execution requires an available plan.
+Object, Goal, and Long (``10``), for 80 task identities in total.
 
 The VLA and SAM3 services use the normal LIBERO runtime configuration. You can
 also connect to services that are already running with ``--vla-endpoint`` and
 ``--sam3-endpoint``.
-
-Use local memory
-----------------
-
-To evaluate with an existing local corpus, select it explicitly:
-
-.. code-block:: bash
-
-   rpent --robot libero --planner flash \
-     --memory-profile local --memory-dir /path/to/memory/libero \
-     --suite libero_object_swap --task 3 --seed 0 \
-     --molmo-endpoint http://127.0.0.1:20703
-
-The selected directory must contain ``flash/object_swap_t3_plan.json`` and
-``flash/object_swap_t3_anchors.json``. Local mode never downloads memory from
-Hugging Face. Evaluation reads the prepared plan without generating or updating
-it. A missing or incomplete plan produces an error; execution does not fall
-back to an LLM planner.
 
 Molmo setup
 -----------

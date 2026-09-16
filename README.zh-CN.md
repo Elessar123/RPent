@@ -161,10 +161,6 @@ rpent --robot libero --suite libero_object_swap --task 2 --seed 0 \
 其他规划器（`api`、`codex`）与模型提供商的配置见[规划器文档](https://rpent.readthedocs.io/zh-cn/latest/rst_source/usage/configure_planner.html)。
 探索模式与本地 memory 评测详见 [LIBERO 文档](https://rpent.readthedocs.io/zh-cn/latest/rst_source/usage/libero.html)。
 
-使用 memory 中准备好的计划评测时，可选择 `--planner flash`。
-[Flash Mode](https://rpent.readthedocs.io/zh-cn/latest/rst_source/usage/flash.html)
-通过重新定位视觉锚点执行计划，无需 LLM 在线规划，仅用于评测。
-
 ### 交互模式
 
 加上 `--interactive`（`-i`）即可在终端里实时引导智能体。在 `you>` 提示符处，内置任务已预填——按 Enter 直接使用，或替换为你自己的任务；智能体运行时，随时输入消息即可在下一轮引导它（`/help` 查看命令，`/quit` 或 Ctrl-D 结束）。需要交互式终端（TTY）。

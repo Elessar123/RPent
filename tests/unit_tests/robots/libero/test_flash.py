@@ -14,12 +14,20 @@
 
 from __future__ import annotations
 
+import argparse
+import json
 from types import SimpleNamespace
 
 import pytest
 
-from robots.libero.robot_spec import TASK_CARD_SUITES, _parse_config
-from robots.libero.task_card.replay import cards, execute, load, pick_succeeded, replay
+from robots.libero.flash.replay import (
+    execute,
+    load,
+    pick_succeeded,
+    plans,
+    replay,
+)
+from robots.libero.robot_spec import FLASH_SUITES, _add_cli_args, _parse_config
 
 
 class _Toolkit:
@@ -68,7 +76,7 @@ def test_replay_reuses_toolkit_opening_observation() -> None:
     result = replay(
         toolkit,
         molmo=SimpleNamespace(),
-        card={"plan": [], "reference": {}, "locator_of": {}},
+        program={"plan": [], "reference": {}, "locator_of": {}},
     )
 
     assert result == {"done": False, "anchors": 0, "plan": 0}
@@ -80,7 +88,7 @@ def test_replay_passes_legacy_pick_thresholds_to_pi0_pick() -> None:
     replay(
         toolkit,
         molmo=SimpleNamespace(),
-        card={
+        program={
             "plan": [
                 {
                     "action": "pi0_pick",
@@ -125,7 +133,7 @@ def test_pick_retry_reuses_relocated_move_arguments() -> None:
     replay(
         toolkit,
         molmo=SimpleNamespace(),
-        card={
+        program={
             "plan": [
                 {
                     "action": "move_to",
@@ -153,7 +161,7 @@ def test_replay_stops_when_attached_anchor_is_not_located() -> None:
     result = replay(
         toolkit,
         molmo=SimpleNamespace(),
-        card={
+        program={
             "plan": [
                 {
                     "action": "move_to",
@@ -184,7 +192,7 @@ def test_replay_propagates_toolkit_exceptions() -> None:
         replay(
             FailingToolkit(),
             molmo=SimpleNamespace(),
-            card={
+            program={
                 "plan": [
                     {
                         "action": "move_to",
@@ -197,15 +205,15 @@ def test_replay_propagates_toolkit_exceptions() -> None:
         )
 
 
-def test_task_card_supports_all_libero_pro_task_and_swap_suites() -> None:
-    assert TASK_CARD_SUITES == {
+def test_flash_supports_all_libero_pro_task_and_swap_suites() -> None:
+    assert FLASH_SUITES == {
         f"libero_{family}_{regime}"
         for family in ("spatial", "object", "goal", "10")
         for regime in ("task", "swap")
     }
 
 
-def test_non_task_card_planner_rejects_molmo_endpoint() -> None:
+def test_non_flash_planner_rejects_molmo_endpoint() -> None:
     args = SimpleNamespace(
         suite="libero_object_swap",
         task=0,
@@ -213,11 +221,11 @@ def test_non_task_card_planner_rejects_molmo_endpoint() -> None:
         molmo_endpoint="http://127.0.0.1:8115",
     )
 
-    with pytest.raises(ValueError, match="requires --planner task_card"):
+    with pytest.raises(ValueError, match="requires --planner flash"):
         _parse_config(args)
 
 
-def test_missing_cards_explains_where_to_download(monkeypatch, tmp_path) -> None:
+def test_missing_plans_explains_where_to_download(monkeypatch, tmp_path) -> None:
     sync_calls = []
     monkeypatch.setattr(
         "rpent.memory.MemoryManager.sync",
@@ -225,34 +233,105 @@ def test_missing_cards_explains_where_to_download(monkeypatch, tmp_path) -> None
     )
 
     with pytest.raises(FileNotFoundError, match="RLinf/RPent-memory") as error:
-        cards(tmp_path / "task_card")
+        plans(tmp_path / "flash")
 
-    assert "--cards" not in str(error.value)
-    assert sync_calls == [
-        {
-            "remote_repo": "RLinf/RPent-memory",
-            "allow_patterns": ("libero/task_card/**",),
-        }
-    ]
+    assert str(tmp_path / "flash") in str(error.value)
+    assert sync_calls == []
 
 
-def test_cards_do_not_require_an_index(tmp_path) -> None:
-    root = tmp_path / "task_card"
+def test_plans_do_not_require_an_index(tmp_path) -> None:
+    root = tmp_path / "flash"
     root.mkdir(parents=True)
     (root / "object_swap_t0_plan.json").write_text('{"plan": []}')
 
-    assert cards(root) == root
+    assert plans(root) == root
 
 
-def test_load_reads_only_runtime_card_fields(tmp_path) -> None:
+def test_load_reads_only_runtime_plan_fields(tmp_path) -> None:
     (tmp_path / "object_swap_t0_plan.json").write_text('{"plan": []}')
     (tmp_path / "object_swap_t0_anchors.json").write_text(
         '{"anchors": [{"phrase": "bowl", "locator": "segment", '
         '"median_xy": [0.1, 0.2]}]}'
     )
 
-    card = load(tmp_path, "object_swap_t0")
+    program = load(tmp_path, "object_swap_t0")
 
-    assert card["plan"] == []
-    assert card["reference"]["bowl"].tolist() == [0.1, 0.2]
-    assert card["locator_of"] == {"bowl": "segment"}
+    assert program["plan"] == []
+    assert program["reference"]["bowl"].tolist() == [0.1, 0.2]
+    assert program["locator_of"] == {"bowl": "segment"}
+
+
+def _local_flash_args(root):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output-dir")
+    parser.add_argument("--planner", default="flash")
+    parser.add_argument("--memory-profile", default="local")
+    parser.add_argument("--memory-dir", default=str(root))
+    _add_cli_args(parser, use_dashboard=False)
+    return parser.parse_args(
+        [
+            "--suite",
+            "libero_spatial_task",
+            "--task",
+            "0",
+            "--molmo-endpoint",
+            "http://localhost:20703",
+        ]
+    )
+
+
+def test_flash_uses_selected_memory_without_downloading(monkeypatch, tmp_path):
+    from rpent.dashboard.events import NullDashboardEventSink
+    from rpent.memory import MemoryManager
+    from rpent.planner.base import build_planner
+
+    root = tmp_path / "custom-memory"
+    flash = root / "flash"
+    flash.mkdir(parents=True)
+    (flash / "spatial_task_t0_plan.json").write_text(
+        json.dumps(
+            {"plan": [{"action": "move_to", "arguments": {"xyz": [0.12, 0.23, 0.7]}}]}
+        )
+    )
+    (flash / "spatial_task_t0_anchors.json").write_text('{"anchors": []}')
+    config = _parse_config(_local_flash_args(root))
+    assert config.prompt_vars["memory_dir"] == str(root)
+
+    def reject_sync(*args, **kwargs):
+        pytest.fail("local Flash Mode must not download memory")
+
+    monkeypatch.setattr(MemoryManager, "sync", reject_sync)
+    toolkit = _Toolkit()
+    toolkit.memory = MemoryManager(config.prompt_vars["memory_dir"])
+    toolkit.primitives = SimpleNamespace(molmo_client=object())
+    planner = build_planner(
+        "flash",
+        robot_name="libero",
+        recipe_tag="spatial_task_t0_s9",
+        output_dir=tmp_path,
+        dashboard_events=NullDashboardEventSink(),
+    )
+    result = planner.solve(
+        system_prompt="", user_message="", toolkit=toolkit, max_turns=0
+    )
+    assert result.error is None
+    assert "spatial/task_t0" in result.finish_result["summary"]
+    assert result.stats["total_input_tokens"] == 0
+    assert toolkit.calls == [("move_to", {"xyz": [0.12, 0.23, 0.7]})]
+
+
+@pytest.mark.parametrize("missing", ["plan", "anchors"])
+def test_local_flash_rejects_incomplete_plan(tmp_path, missing):
+    root = tmp_path / "flash"
+    root.mkdir()
+    present = "anchors" if missing == "plan" else "plan"
+    (root / f"spatial_task_t0_{present}.json").write_text("{}")
+    with pytest.raises(ValueError, match="no complete Flash plan"):
+        _parse_config(_local_flash_args(tmp_path))
+
+
+def test_flash_config_rejects_exploration(tmp_path):
+    args = _local_flash_args(tmp_path)
+    args.explore = True
+    with pytest.raises(ValueError, match="evaluation-only"):
+        _parse_config(args)

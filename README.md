@@ -161,6 +161,10 @@ rpent --robot libero --suite libero_object_swap --task 2 --seed 0 \
 See the [planner docs](https://rpent.readthedocs.io/en/latest/rst_source/usage/configure_planner.html) to configure other planners (`api`, `codex`) and model providers.
 For the exploration workflow and local-memory evaluation, see [LIBERO exploration mode](https://rpent.readthedocs.io/en/latest/rst_source/usage/libero.html#exploration-and-local-memory-evaluation).
 
+For evaluation with a prepared plan from memory, use `--planner flash`.
+[Flash Mode](https://rpent.readthedocs.io/en/latest/rst_source/usage/flash.html)
+re-localizes visual anchors without online LLM planning and is available only for evaluation.
+
 ### Interactive CLI mode
 
 Add `--interactive` (`-i`) to steer the agent live from your terminal. At the `you>` prompt, the built-in task is pre-filled — press Enter to use it or replace it with your own — then type any message while it runs to steer the agent at the next turn (`/help` lists commands; `/quit` or Ctrl-D ends). Requires an interactive terminal (TTY).

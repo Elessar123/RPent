@@ -197,6 +197,26 @@ class RoboTwinPrimitives:
             "episode_status": episode_status,
         }
 
+    def execute_action(
+        self, values: list[float], action_type: str = "qpos"
+    ) -> dict[str, Any]:
+        """Execute one native qpos or end-effector waypoint."""
+        if np.asarray(values).ndim != 1:
+            raise ValueError("values must be a single flat action")
+        self._check_cancelled()
+        obs, _, _, _, info = self.env.step(values, action_type=action_type)
+        if self._recording and isinstance(obs, dict) and "main_images" in obs:
+            self.record_frame(obs["main_images"])
+        executed = int(info.get("executed_actions", 0))
+        self.native_actions += executed
+        return {
+            **self._completion(
+                requested=1, executed=executed, status=info["episode_status"]
+            ),
+            "action_type": action_type,
+            "episode_status": info["episode_status"],
+        }
+
     def lingbot_act(
         self, *, chunks: int = 4, use_length: int = 50, prompt: str | None = None
     ) -> dict[str, Any]:

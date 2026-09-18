@@ -972,6 +972,7 @@ _PRIMITIVE_ACTIONS = frozenset(
         "set_gripper",
         "release",
         "scripted_grasp",
+        "execute_action",
         "rldx_skill",
         "rldx_arm",
         "navigate_to",
@@ -997,3 +998,25 @@ def write_recipe_from_states(state: EnvState, recipe_tag: str) -> str:
     recipe_name = f"{recipe_tag}_recipe.jsonl"
     state.save(recipe_name, commands, step=None)
     return recipe_name
+
+
+EXECUTE_ACTION_SPEC = {
+    "name": "execute_action",
+    "description": "Execute one native PandaOmron action without VLA inference. values "
+    "has 12 normalized controls in [-1,1]: end-effector translation (3), "
+    "rotation (3), gripper (+1 close, -1 open), base motion (4), control "
+    "mode (-1 arm, +1 base). Uses the same flat environment layout as "
+    "RLDX.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "values": {
+                "type": "array",
+                "items": {"type": "number", "minimum": -1, "maximum": 1},
+                "minItems": 12,
+                "maxItems": 12,
+            }
+        },
+        "required": ["values"],
+    },
+}

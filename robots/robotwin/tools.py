@@ -604,3 +604,31 @@ TOOLS_SPEC = [
         },
     },
 ]
+
+
+EXECUTE_ACTION_SPEC = {
+    "name": "execute_action",
+    "description": "Execute one native RoboTwin action without VLA inference. qpos: 14 "
+    "values, left joint targets (6, radians), left gripper, right joint "
+    "targets (6, radians), right gripper. ee: 16 values, left xyz "
+    "(metres), quaternion wxyz, gripper, then the same for right. Grippers "
+    "use 0 closed, 1 open; ee poses are absolute world poses. One action "
+    "is a native waypoint execution.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "values": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 14,
+                "maxItems": 16,
+            },
+            "action_type": {
+                "type": "string",
+                "enum": ["qpos", "ee"],
+                "default": "qpos",
+            },
+        },
+        "required": ["values"],
+    },
+}

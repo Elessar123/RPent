@@ -23,6 +23,7 @@ import pytest
 
 from rpent.cli.main import _build_argparser
 from rpent.dashboard.events import NullDashboardEventSink
+from rpent.robots.components.action_spec import box_action_spec, direct_action_tool_spec
 from rpent.utils import templates
 
 
@@ -31,7 +32,7 @@ def robot(request):
     return request.param
 
 
-def make_primitive(robot):
+def make_primitive(robot, action_size=None):
     """Keep the real primitive and env client, replacing only RPC and rendering."""
     client_module = importlib.import_module(f"robots.{robot}.env_client")
     class_name = {"libero": "Libero", "robocasa": "RoboCasa", "robotwin": "RoboTwin"}[
@@ -54,7 +55,22 @@ def make_primitive(robot):
         if robot == "robocasa"
         else (obs, 0.0, False, False, info)
     )
-    env._client = SimpleNamespace(call=Mock(return_value=step_result))
+    size = action_size or {"libero": 7, "robocasa": 12, "robotwin": 14}[robot]
+    specs = {
+        "default": box_action_spec([-1] * size, [1] * size, "Test environment controls")
+    }
+    if robot == "robotwin":
+        specs = {
+            "qpos": box_action_spec(
+                [-np.inf] * size, [np.inf] * size, "Test joint controls"
+            ),
+            "ee": box_action_spec([-np.inf] * 16, [np.inf] * 16, "Test pose controls"),
+        }
+
+    def call(method, **kwargs):
+        return specs if method == "env.get_action_spec" else step_result
+
+    env._client = SimpleNamespace(call=Mock(side_effect=call))
     env.last_obs = obs
     env.last_reset_info = {}
     if robot != "robocasa":
@@ -148,7 +164,10 @@ def test_cli_factory_gates_tool_and_preserves_action_records(
     result = toolkit.execute_tool("execute_action", {"values": values}).result
     if not enabled:
         assert "unknown tool" in result["error"]
-        primitive.env._client.call.assert_not_called()
+        assert all(
+            call.args[0] != "env.step"
+            for call in primitive.env._client.call.call_args_list
+        )
         return
     assert "error" not in result
     call = primitive.env._client.call.call_args
@@ -176,15 +195,19 @@ def test_invalid_action_never_reaches_environment(robot, invalid):
     values = invalid * dim
     with pytest.raises(ValueError):
         primitive.execute_action(values)
-    primitive.env._client.call.assert_not_called()
+    assert all(
+        call.args[0] != "env.step" for call in primitive.env._client.call.call_args_list
+    )
 
 
 @pytest.mark.parametrize("robot", ["libero", "robocasa"])
 def test_out_of_range_controls_are_rejected(robot):
     primitive = make_primitive(robot)
-    with pytest.raises(ValueError, match=r"\[-1, 1\]"):
+    with pytest.raises(ValueError, match="environment.*bounds"):
         primitive.execute_action([1.1] * (7 if robot == "libero" else 12))
-    primitive.env._client.call.assert_not_called()
+    assert all(
+        call.args[0] != "env.step" for call in primitive.env._client.call.call_args_list
+    )
 
 
 def test_robotwin_ee_action_is_forwarded_with_its_native_type():
@@ -203,7 +226,9 @@ def test_robotwin_rejects_wrong_layout_and_terminal_episode():
     primitive.env.terminated = True
     with pytest.raises(RuntimeError, match="terminal"):
         primitive.execute_action([0] * 14)
-    primitive.env._client.call.assert_not_called()
+    assert all(
+        call.args[0] != "env.step" for call in primitive.env._client.call.call_args_list
+    )
 
 
 def test_robocasa_reseeds_vla_after_direct_action():
@@ -234,4 +259,76 @@ def test_cancelled_direct_action_does_not_step(robot):
         primitive.execute_action(
             [0.0] * {"libero": 7, "robocasa": 12, "robotwin": 14}[robot]
         )
-    primitive.env._client.call.assert_not_called()
+    assert all(
+        call.args[0] != "env.step" for call in primitive.env._client.call.call_args_list
+    )
+
+
+@pytest.mark.parametrize("robot", ["libero", "robocasa"])
+@pytest.mark.parametrize("size", [3, 9, 20])
+def test_direct_action_uses_environment_dimensions(robot, size):
+    primitive = make_primitive(robot, action_size=size)
+    tool = primitive.env.get_direct_action_tool_spec()
+    values_schema = tool["input_schema"]["properties"]["values"]
+    assert values_schema["minItems"] == values_schema["maxItems"] == size
+    primitive.execute_action([0.25] * size)
+    call = primitive.env._client.call.call_args
+    assert call.args[0] == "env.step"
+    np.testing.assert_array_equal(call.kwargs["args"][0], [0.25] * size)
+    with pytest.raises(ValueError, match=f"{size} finite"):
+        primitive.execute_action([0.0] * (size + 1))
+    assert (
+        sum(
+            c.args[0] == "env.get_action_spec"
+            for c in primitive.env._client.call.call_args_list
+        )
+        == 1
+    )
+
+
+def test_direct_action_uses_per_coordinate_environment_bounds():
+    primitive = make_primitive("libero", action_size=3)
+    primitive.env.action_specs = {
+        "default": box_action_spec(
+            [-2, 0, -np.inf], [2, 5, np.inf], "Custom controller"
+        )
+    }
+    primitive.execute_action([1.5, 4.0, -10.0])
+    with pytest.raises(ValueError, match="environment.*bounds"):
+        primitive.execute_action([1.5, -0.1, 0.0])
+    assert (
+        sum(c.args[0] == "env.step" for c in primitive.env._client.call.call_args_list)
+        == 1
+    )
+    tool = primitive.env.get_direct_action_tool_spec()
+    assert "Custom controller" in tool["description"]
+    assert "Infinity" not in tool["description"]
+
+
+def test_tool_action_types_come_from_environment():
+    specs = {"velocity": box_action_spec([-2] * 4, [2] * 4, "Wheel speeds")}
+    tool = direct_action_tool_spec(specs)
+    assert tool["input_schema"]["properties"]["action_type"]["enum"] == ["velocity"]
+    assert tool["input_schema"]["properties"]["values"]["minItems"] == 4
+
+
+@pytest.mark.parametrize("robot", ["libero", "robocasa"])
+def test_environment_rpc_reports_native_bounds(robot):
+    module = importlib.import_module(f"robots.{robot}.env_server")
+    low, high = np.array([-2.0, 0.0, -0.5]), np.array([2.0, 6.0, 0.5])
+    if robot == "libero":
+        worker = SimpleNamespace(env_call=Mock(return_value=(low, high)))
+        facade = module.LiberoEnvFacade(
+            SimpleNamespace(env=SimpleNamespace(workers=[worker])), meta={}
+        )
+    else:
+        facade = module.RoboCasaEnvFacade.__new__(module.RoboCasaEnvFacade)
+        facade.env = SimpleNamespace(action_spec=(low, high))
+    specs = facade.get_action_spec()
+    assert specs["default"]["low"] == low.tolist()
+    assert specs["default"]["high"] == high.tolist()
+    if robot == "libero":
+        assert "env.get_action_spec" in facade._readonly_methods
+        worker.env_call.assert_called_once_with(
+            "__getattribute__", args=["action_spec"], target="robosuite"
+        )

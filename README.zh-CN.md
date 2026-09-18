@@ -180,10 +180,11 @@ rpent --robot libero --suite libero_object_swap --task 2 --seed 0 \
 `execute_action(values=[...])` primitive。每次调用执行一个环境原生动作，
 并记录执行后的状态。不传此参数时，不注册该工具。
 
-LIBERO 使用 7 维、RoboCasa 使用 12 维归一化控制量，范围均为 `[-1, 1]`。
-RoboTwin 默认使用 14 维关节位置动作（`action_type="qpos"`），也支持通过
-`action_type="ee"` 传入 16 维末端位姿动作。各维含义见对应机器人的工具说明；
-RoboTwin 的一次动作对应原生 waypoint 执行。
+工具从连接的执行环境读取动作维度、各维取值范围和支持的动作模式。
+按该环境原生控制器的顺序传入动作；工具说明中会列出当前环境的动作规格。
+RoboTwin 提供其原生关节和末端位姿 waypoint 模式。
+连接外部环境服务时，需要同步更新服务端与客户端：此可选工具依赖
+`env.get_action_spec` RPC。
 
 ### 交互模式
 

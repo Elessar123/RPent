@@ -198,13 +198,14 @@ class RoboTwinPrimitives:
         }
 
     def execute_action(
-        self, values: list[float], action_type: str = "qpos"
+        self, values: list[float], action_type: str | None = None
     ) -> dict[str, Any]:
         """Execute one native qpos or end-effector waypoint."""
-        if np.asarray(values).ndim != 1:
-            raise ValueError("values must be a single flat action")
+        if action_type is None:
+            action_type = next(iter(self.env.action_specs))
+        action = self.env.validate_action(values, action_type=action_type)
         self._check_cancelled()
-        obs, _, _, _, info = self.env.step(values, action_type=action_type)
+        obs, _, _, _, info = self.env.step(action, action_type=action_type)
         if self._recording and isinstance(obs, dict) and "main_images" in obs:
             self.record_frame(obs["main_images"])
         executed = int(info.get("executed_actions", 0))

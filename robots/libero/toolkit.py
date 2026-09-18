@@ -70,7 +70,7 @@ class LiberoToolkit(Toolkit):
         if enable_direct_action:
             self.add_tool(
                 "execute_action",
-                libero_tools.EXECUTE_ACTION_SPEC,
+                self._primitives.env.get_direct_action_tool_spec(),
                 partial(
                     self._execute_primitive,
                     "execute_action",

@@ -58,7 +58,7 @@ class RoboCasaToolkit(Toolkit):
         if enable_direct_action:
             self.add_tool(
                 "execute_action",
-                robocasa_tools.EXECUTE_ACTION_SPEC,
+                self._primitives.env.get_direct_action_tool_spec(),
                 self._primitives.execute_action,
             )
 

@@ -140,12 +140,8 @@ class LiberoPrimitives:
             self.record_frame(obs)
 
     def execute_action(self, values: list[float]) -> dict:
-        """Execute one native 7D action and refresh observations and recording."""
-        action = np.asarray(values, dtype=np.float64)
-        if action.shape != (7,) or not np.isfinite(action).all():
-            raise ValueError("values must contain 7 finite numbers")
-        if np.any(np.abs(action) > 1):
-            raise ValueError("LIBERO action values must be in [-1, 1]")
+        """Execute one native action and refresh observations and recording."""
+        action = self.env.validate_action(values)
         self._step_env(action)
         return {"executed_steps": 1}
 
@@ -1992,24 +1988,3 @@ def back_project(
     if depth_m is not None:
         out["depth_m"] = round(depth_m, 4)
     return out
-
-
-EXECUTE_ACTION_SPEC = {
-    "name": "execute_action",
-    "description": "Execute one native LIBERO action without VLA inference. values has 7 "
-    "normalized controls in [-1,1]: end-effector translation xyz, rotation "
-    "xyz, then gripper (+1 close, -1 open). These are controller inputs, "
-    "not absolute poses or joint angles.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "values": {
-                "type": "array",
-                "items": {"type": "number", "minimum": -1, "maximum": 1},
-                "minItems": 7,
-                "maxItems": 7,
-            }
-        },
-        "required": ["values"],
-    },
-}

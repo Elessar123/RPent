@@ -118,7 +118,7 @@ class RoboTwinToolkit(Toolkit):
         if enable_direct_action:
             self.add_tool(
                 "execute_action",
-                tools.EXECUTE_ACTION_SPEC,
+                self._primitives.env.get_direct_action_tool_spec(),
                 partial(self._step, "execute_action"),
             )
         initial = self.get_env_state(

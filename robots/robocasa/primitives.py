@@ -92,12 +92,8 @@ class RoboCasaPrimitives:
 
     # ---- action helpers ----
     def execute_action(self, values: list[float]) -> dict:
-        """Execute one native 12D action and invalidate the VLA frame history."""
-        action = np.asarray(values, dtype=np.float64)
-        if action.shape != (12,) or not np.isfinite(action).all():
-            raise ValueError("values must contain 12 finite numbers")
-        if np.any(np.abs(action) > 1):
-            raise ValueError("RoboCasa action values must be in [-1, 1]")
+        """Execute one native action and invalidate the VLA frame history."""
+        action = self.env.validate_action(values)
         if self._check_cancelled is not None:
             self._check_cancelled()
         self._vla_desync = True

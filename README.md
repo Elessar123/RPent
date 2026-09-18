@@ -180,10 +180,12 @@ expose the optional `execute_action(values=[...])` primitive alongside VLA and
 scripted tools. It executes one native environment action per call and records
 the resulting state. Without the flag, the tool is not registered.
 
-Use 7 normalized controls for LIBERO and 12 for RoboCasa, each in `[-1, 1]`.
-RoboTwin accepts 14 joint-position values by default (`action_type="qpos"`),
-or 16 end-effector values with `action_type="ee"`. The tool description gives
-the robot-specific layout; RoboTwin actions are native waypoint executions.
+The tool reads action dimensions, per-coordinate bounds, and supported action
+modes from the connected environment. Supply values in that environment's native
+controller order; the tool description includes its current specification.
+RoboTwin advertises its native joint and end-effector waypoint modes.
+When attaching an external environment server, update it together with the client:
+this optional tool requires the `env.get_action_spec` RPC.
 
 ### Interactive CLI mode
 

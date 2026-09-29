@@ -110,6 +110,11 @@ def test_cli_factory_gates_tool_and_preserves_action_records(
     primitive = make_primitive(robot)
     (tmp_path / "memory").mkdir()
     (tmp_path / "memory" / "MEMORY.md").write_text("Offline corpus")
+    if robot == "robocasa":
+        (tmp_path / "memory" / "global").mkdir()
+        (tmp_path / "memory" / "global" / "GLOBAL_MEMORY.md").write_text(
+            "# Offline global memory\n"
+        )
     monkeypatch.setattr(templates, "get_output_dir", lambda: tmp_path)
     monkeypatch.setattr(module, "get_output_dir", lambda: tmp_path)
     if robot == "robotwin":
@@ -146,7 +151,7 @@ def test_cli_factory_gates_tool_and_preserves_action_records(
     args += (
         ["--suite", "libero_spatial", "--task", "0"]
         if robot == "libero"
-        else ["--task-name", "test_task"]
+        else ["--task-name", "OpenDrawer" if robot == "robocasa" else "test_task"]
     )
     if enabled:
         args.append("--enable-direct-action")

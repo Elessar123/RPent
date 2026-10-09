@@ -347,6 +347,7 @@ def _parse_config(args: argparse.Namespace) -> RunConfig:
         "seed": args.seed,
         "recipe_tag": recipe_tag,
         "mode": "explore" if explore else "eval",
+        "enable_direct_action": getattr(args, "enable_direct_action", False),
         "memory_profile": memory_profile,
         "memory_dir": str(memory_dir),
         "reference_tag": f"{args.suite.replace('libero_', '')}_t{args.task}_s0",

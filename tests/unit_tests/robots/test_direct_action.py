@@ -317,23 +317,143 @@ def test_tool_action_types_come_from_environment():
     assert tool["input_schema"]["properties"]["values"]["minItems"] == 4
 
 
-@pytest.mark.parametrize("robot", ["libero", "robocasa"])
-def test_environment_rpc_reports_native_bounds(robot):
-    module = importlib.import_module(f"robots.{robot}.env_server")
-    low, high = np.array([-2.0, 0.0, -0.5]), np.array([2.0, 6.0, 0.5])
-    if robot == "libero":
-        worker = SimpleNamespace(env_call=Mock(return_value=(low, high)))
-        facade = module.LiberoEnvFacade(
-            SimpleNamespace(env=SimpleNamespace(workers=[worker])), meta={}
-        )
-    else:
-        facade = module.RoboCasaEnvFacade.__new__(module.RoboCasaEnvFacade)
-        facade.env = SimpleNamespace(action_spec=(low, high))
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize(
+    "explore,profile", [(False, "local"), (True, "local"), (False, "hf")]
+)
+def test_libero_prompt_matches_direct_action_enablement(
+    enabled, explore, profile, tmp_path
+):
+    from robots.libero import robot_spec
+
+    memory = tmp_path / "memory"
+    memory.mkdir()
+    (memory / "MEMORY.md").write_text("Offline memory")
+    parser = _build_argparser()
+    robot_spec._add_cli_args(parser, use_dashboard=False)
+    args = parser.parse_args(
+        [
+            "--robot",
+            "libero",
+            "--suite",
+            "libero_spatial",
+            "--task",
+            "0",
+            "--memory-profile",
+            profile,
+            "--memory-dir",
+            str(memory),
+        ]
+    )
+    if profile == "hf":
+        args.memory_dir = None
+    args.enable_direct_action = enabled
+    args.explore = explore
+    config = robot_spec._parse_config(args)
+    from robots.libero.prompt_bundle import system_prompt
+    from rpent.prompt.utils import format_prompt
+
+    variables = {**config.prompt_vars, "output_dir": tmp_path}
+    prompt = format_prompt(system_prompt(variables), variables=variables)
+    allowed = prompt.split("ALLOWED PRIMITIVES", 1)[1].split(".", 1)[0]
+    assert ("`execute_action`" in allowed) is enabled
+    assert ("`execute_action`" in prompt) is enabled
+    assert ("SINGLE-ATTEMPT MODE" in prompt) is not explore
+    assert ("Also allowed: `reset`" in prompt) is explore
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("mode", ["delta", "absolute"])
+def test_libero_rpc_describes_active_controller(legacy, mode):
+    from robots.libero.env_server import LiberoEnvFacade
+    from rpent.robots.components.action_spec import direct_action_tool_spec
+
+    low, high = np.array([-2.0] * 6 + [-1.0]), np.array([2.0] * 6 + [1.0])
+    arm = {
+        "type": "OSC_POSE",
+        "input_min": -2,
+        "input_max": 2,
+        "output_min": [-0.02] * 3 + [-0.25] * 3,
+        "output_max": [0.02] * 3 + [0.25] * 3,
+        "impedance_mode": "fixed",
+        "input_ref_frame": "base",
+        "input_type": mode,
+        "control_delta": mode == "delta",
+    }
+    config = (
+        {"controller_config": arm}
+        if legacy
+        else {"composite_controller_config": {"body_parts": {"right": arm}}}
+    )
+    attributes = {"action_spec": (low, high), "robot_configs": [config]}
+    worker = SimpleNamespace(
+        env_call=Mock(side_effect=lambda method, args, target: attributes[args[0]])
+    )
+    facade = LiberoEnvFacade(
+        SimpleNamespace(env=SimpleNamespace(workers=[worker])), meta={}
+    )
     specs = facade.get_action_spec()
     assert specs["default"]["low"] == low.tolist()
     assert specs["default"]["high"] == high.tolist()
-    if robot == "libero":
-        assert "env.get_action_spec" in facade._readonly_methods
-        worker.env_call.assert_called_once_with(
-            "__getattribute__", args=["action_spec"], target="robosuite"
-        )
+    description = direct_action_tool_spec(specs)["description"]
+    assert "[x, y, z, rx, ry, rz], then gripper" in description
+    assert ("world" if legacy else "base") + " reference frame" in description
+    assert mode + " control" in description
+    assert "axis-angle" in description
+    assert "-1 opens, +1 closes" in description
+    assert "metres" in description and "radians" in description
+    if mode == "delta":
+        assert "0.02" in description and "0.25" in description
+        assert "normalized" in description
+    assert "env.get_action_spec" in facade._readonly_methods
+
+
+@pytest.mark.parametrize("base_first", [False, True])
+def test_robocasa_rpc_describes_active_layout(base_first):
+    from robots.robocasa.env_server import RoboCasaEnvFacade
+    from rpent.robots.components.action_spec import direct_action_tool_spec
+
+    low, high = np.full(12, -1.0), np.full(12, 1.0)
+    arm = SimpleNamespace(
+        input_type="delta",
+        input_ref_frame="base",
+        input_min=np.full(6, -1),
+        input_max=np.ones(6),
+        output_min=np.array([-0.05] * 3 + [-0.5] * 3),
+        output_max=np.array([0.05] * 3 + [0.5] * 3),
+    )
+    torso = SimpleNamespace(
+        input_type="delta",
+        input_min=np.array([-1]),
+        input_max=np.array([1]),
+        output_min=np.array([-0.05]),
+        output_max=np.array([0.05]),
+    )
+    indexes = {"right": (0, 6), "right_gripper": (6, 7)}
+    indexes.update(
+        {"base": (7, 10), "torso": (10, 11)}
+        if base_first
+        else {"torso": (7, 8), "base": (8, 11)}
+    )
+    controller = SimpleNamespace(
+        part_controllers={"right": arm, "torso": torso}, _action_split_indexes=indexes
+    )
+    facade = RoboCasaEnvFacade.__new__(RoboCasaEnvFacade)
+    facade.env = SimpleNamespace(
+        action_spec=(low, high),
+        robots=[SimpleNamespace(composite_controller=controller)],
+    )
+    specs = facade.get_action_spec()
+    assert specs["default"]["low"] == low.tolist()
+    assert specs["default"]["high"] == high.tolist()
+    description = direct_action_tool_spec(specs)["description"]
+    start, end = indexes["base"]
+    assert f"values[{start}:{end}]: base [vx, vy, yaw_rate]" in description
+    assert "metres/second" in description and "radians/second" in description
+    assert "base reference frame" in description and "axis-angle" in description
+    assert "values[11]: base_mode; >0" in description
+    assert (
+        "previous desired pose" in description
+        and "current achieved pose" in description
+    )
+    assert "-1 opens, +1 closes" in description

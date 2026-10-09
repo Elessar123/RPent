@@ -237,17 +237,49 @@ class LiberoEnvFacade(BaseEnvFacade):
         return to_numpy_tree(self._env.current_raw_obs[self._env_idx])
 
     def get_action_spec(self) -> dict:
-        """Read the active simulator's controller action bounds."""
-        low, high = self._env.env.workers[self._env_idx].env_call(
+        """Describe the active single-arm OSC layout and native input bounds."""
+        worker = self._env.env.workers[self._env_idx]
+        low, high = worker.env_call(
             "__getattribute__", args=["action_spec"], target="robosuite"
         )
-        return {
-            "default": box_action_spec(
-                low,
-                high,
-                "Native controls in the active environment's controller order.",
+        robot_config = worker.env_call(
+            "__getattribute__", args=["robot_configs"], target="robosuite"
+        )[0]
+        # Standard LIBERO uses a composite controller; LIBERO-plus uses
+        # robosuite 1.4's single arm controller configuration.
+        if "composite_controller_config" in robot_config:
+            arm = robot_config["composite_controller_config"]["body_parts"]["right"]
+            frame = arm.get("input_ref_frame", "base")
+            mode = arm.get("input_type", "delta")
+        else:
+            arm = robot_config["controller_config"]
+            frame = "world"
+            mode = "delta" if arm.get("control_delta", True) else "absolute"
+        impedance = arm.get("impedance_mode", "fixed")
+        gains = {
+            "fixed": "",
+            "variable_kp": "6 stiffness gains, then ",
+            "variable": "6 damping ratios, 6 stiffness gains, then ",
+        }[impedance]
+        description = (
+            f"Native {arm['type']} action: {gains}"
+            "[x, y, z, rx, ry, rz], then gripper. "
+            f"Arm commands use the {frame} reference frame and {mode} control; "
+            "rotation is an axis-angle vector, not Euler angles. "
+        )
+        if mode == "delta":
+            description += (
+                "Arm inputs are normalized controller commands, linearly mapped "
+                f"from input_min={arm['input_min']} / input_max={arm['input_max']} "
+                f"to output_min={arm['output_min']} / output_max={arm['output_max']} "
+                "(xyz in metres per action; rotation in radians per action). "
             )
-        }
+        else:
+            description += (
+                "Arm inputs are absolute xyz in metres and axis-angle in radians. "
+            )
+        description += "Gripper: -1 opens, +1 closes, 0 keeps the current command."
+        return {"default": box_action_spec(low, high, description)}
 
     def get_env_meta(self) -> dict:
         """Return the meta info this server was launched with."""

@@ -148,13 +148,49 @@ class RoboCasaEnvFacade(MainThreadServeMixin, BaseEnvFacade):
         )
 
     def get_action_spec(self) -> dict:
-        """Read the active simulator's controller action bounds."""
+        """Describe the active PandaOmron composite layout and native bounds."""
         low, high = self.env.action_spec
+        controller = self.env.robots[0].composite_controller
+        parts = controller.part_controllers
+        arm = parts["right"]
+        torso = parts["torso"]
+        descriptions = {
+            "right": (
+                f"OSC_POSE [x, y, z, rx, ry, rz], {arm.input_type} control in the "
+                f"{arm.input_ref_frame} reference frame; rotation is axis-angle, "
+                "not Euler angles. "
+                f"Input range {arm.input_min.tolist()} to {arm.input_max.tolist()} "
+                f"maps to {arm.output_min.tolist()} to {arm.output_max.tolist()} "
+                "(xyz metres, rotation radians) for delta control; absolute "
+                "control takes xyz metres and axis-angle radians directly"
+            ),
+            "right_gripper": "gripper: -1 opens, +1 closes, 0 keeps the current command",
+            "base": (
+                "base [vx, vy, yaw_rate]: x/y linear velocity in metres/second "
+                "in the current base frame, positive yaw counterclockwise in radians/second"
+            ),
+            "torso": (
+                f"vertical torso joint, {torso.input_type} position control; "
+                f"input range {torso.input_min.tolist()} to {torso.input_max.tolist()} "
+                f"maps to {torso.output_min.tolist()} to {torso.output_max.tolist()} "
+                "metres for delta control; positive raises the torso"
+            ),
+        }
+        layout = [
+            f"values[{start}:{end}]: {descriptions[name]}."
+            for name, (start, end) in controller._action_split_indexes.items()
+        ]
+        layout.append(
+            f"values[{len(low) - 1}]: base_mode; >0 updates arm deltas from the "
+            "previous desired pose (track the moving base), <=0 from the current "
+            "achieved pose. This selects the arm goal update rule, not whether "
+            "base velocity commands execute."
+        )
         return {
             "default": box_action_spec(
                 low,
                 high,
-                "Native controls in the active environment's controller order.",
+                "Native PandaOmron HYBRID_MOBILE_BASE action. " + " ".join(layout),
             )
         }
 

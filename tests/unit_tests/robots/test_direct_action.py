@@ -23,7 +23,8 @@ import pytest
 
 from rpent.cli.main import _build_argparser
 from rpent.dashboard.events import NullDashboardEventSink
-from rpent.robots.components.action_spec import box_action_spec, direct_action_tool_spec
+from rpent.robots.components.action_spec import box_action_spec, direct_action_tool
+from rpent.tools import ToolResult
 from rpent.utils import templates
 
 
@@ -131,7 +132,7 @@ def test_cli_factory_gates_tool_and_preserves_action_records(
             state={}, command=command, result=result, elapsed_s=elapsed_s
         ):
             pass
-        return result
+        return ToolResult(data=result)
 
     monkeypatch.setattr(toolkit_cls, "get_env_state", capture)
     parser = _build_argparser()
@@ -159,14 +160,14 @@ def test_cli_factory_gates_tool_and_preserves_action_records(
     toolkit = spec.get_toolkit(
         runtime_kwargs={}, dashboard_events=NullDashboardEventSink(), config=config
     )
-    names = {s["name"] for s in toolkit.get_tools_spec()}
+    names = {definition.name for definition in toolkit.list_tools()}
     assert ("execute_action" in names) == enabled
     assert "move_to" in names
     assert {"libero": "pi0_pick", "robocasa": "rldx_skill", "robotwin": "lingbot_act"}[
         robot
     ] in names
     values = [0.1] * {"libero": 7, "robocasa": 12, "robotwin": 14}[robot]
-    result = toolkit.execute_tool("execute_action", {"values": values}).result
+    result = toolkit.execute_tool("execute_action", {"values": values}).data
     if not enabled:
         assert "unknown tool" in result["error"]
         assert all(
@@ -273,9 +274,11 @@ def test_cancelled_direct_action_does_not_step(robot):
 @pytest.mark.parametrize("size", [3, 9, 20])
 def test_direct_action_uses_environment_dimensions(robot, size):
     primitive = make_primitive(robot, action_size=size)
-    tool = primitive.env.get_direct_action_tool_spec()
-    values_schema = tool["input_schema"]["properties"]["values"]
+    tool = primitive.env.get_direct_action_tool(primitive.execute_action)
+    values_schema = tool.input_schema["properties"]["values"]
     assert values_schema["minItems"] == values_schema["maxItems"] == size
+    with pytest.raises(ValueError):
+        tool.args_schema.model_validate({"values": [0.0] * (size + 1)})
     primitive.execute_action([0.25] * size)
     call = primitive.env._client.call.call_args
     assert call.args[0] == "env.step"
@@ -305,16 +308,21 @@ def test_direct_action_uses_per_coordinate_environment_bounds():
         sum(c.args[0] == "env.step" for c in primitive.env._client.call.call_args_list)
         == 1
     )
-    tool = primitive.env.get_direct_action_tool_spec()
-    assert "Custom controller" in tool["description"]
-    assert "Infinity" not in tool["description"]
+    tool = primitive.env.get_direct_action_tool(primitive.execute_action)
+    assert "Custom controller" in tool.description
+    assert "Infinity" not in tool.description
 
 
 def test_tool_action_types_come_from_environment():
     specs = {"velocity": box_action_spec([-2] * 4, [2] * 4, "Wheel speeds")}
-    tool = direct_action_tool_spec(specs)
-    assert tool["input_schema"]["properties"]["action_type"]["enum"] == ["velocity"]
-    assert tool["input_schema"]["properties"]["values"]["minItems"] == 4
+    tool = direct_action_tool(specs, lambda **kwargs: ToolResult())
+    assert tool.input_schema["properties"]["action_type"]["const"] == "velocity"
+    assert (
+        tool.args_schema.model_validate({"values": [0.0] * 4}).action_type == "velocity"
+    )
+    with pytest.raises(ValueError):
+        tool.args_schema.model_validate({"values": [0.0] * 4, "action_type": "invalid"})
+    assert tool.input_schema["properties"]["values"]["minItems"] == 4
 
 
 @pytest.mark.parametrize("enabled", [False, True])
@@ -366,7 +374,7 @@ def test_libero_prompt_matches_direct_action_enablement(
 @pytest.mark.parametrize("mode", ["delta", "absolute"])
 def test_libero_rpc_describes_active_controller(legacy, mode):
     from robots.libero.env_server import LiberoEnvFacade
-    from rpent.robots.components.action_spec import direct_action_tool_spec
+    from rpent.robots.components.action_spec import direct_action_tool
 
     low, high = np.array([-2.0] * 6 + [-1.0]), np.array([2.0] * 6 + [1.0])
     arm = {
@@ -395,7 +403,7 @@ def test_libero_rpc_describes_active_controller(legacy, mode):
     specs = facade.get_action_spec()
     assert specs["default"]["low"] == low.tolist()
     assert specs["default"]["high"] == high.tolist()
-    description = direct_action_tool_spec(specs)["description"]
+    description = direct_action_tool(specs, lambda **kwargs: ToolResult()).description
     assert "[x, y, z, rx, ry, rz], then gripper" in description
     assert ("world" if legacy else "base") + " reference frame" in description
     assert mode + " control" in description
@@ -411,7 +419,7 @@ def test_libero_rpc_describes_active_controller(legacy, mode):
 @pytest.mark.parametrize("base_first", [False, True])
 def test_robocasa_rpc_describes_active_layout(base_first):
     from robots.robocasa.env_server import RoboCasaEnvFacade
-    from rpent.robots.components.action_spec import direct_action_tool_spec
+    from rpent.robots.components.action_spec import direct_action_tool
 
     low, high = np.full(12, -1.0), np.full(12, 1.0)
     arm = SimpleNamespace(
@@ -446,7 +454,7 @@ def test_robocasa_rpc_describes_active_layout(base_first):
     specs = facade.get_action_spec()
     assert specs["default"]["low"] == low.tolist()
     assert specs["default"]["high"] == high.tolist()
-    description = direct_action_tool_spec(specs)["description"]
+    description = direct_action_tool(specs, lambda **kwargs: ToolResult()).description
     start, end = indexes["base"]
     assert f"values[{start}:{end}]: base [vx, vy, yaw_rate]" in description
     assert "metres/second" in description and "radians/second" in description

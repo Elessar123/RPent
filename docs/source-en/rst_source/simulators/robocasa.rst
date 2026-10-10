@@ -227,12 +227,12 @@ such as ``openai:gpt-6-astra`` are accepted. Use
 override selection. Corpus selection does not change the evaluation model or
 its reasoning effort.
 
-``--memory-revision`` accepts a branch, tag or commit and defaults to
-``release/v0.1``. Each preparation resolves the revision online and downloads
+The HF branch is fixed to ``release/v0.1`` by the implementation.
+Each preparation resolves that branch online and downloads
 only the selected subtree into a repository/commit-isolated cache. Resolution
 or download failures stop preparation; another corpus or revision is not used
 as a fallback. For offline runs, download once and use the local profile.
-These selectors apply only to HF evaluation; local memory and exploration
+``--memory-version`` applies only to HF evaluation; local memory and exploration
 continue to use ``--memory-dir``.
 
 The selected corpus root has this layout:
@@ -397,7 +397,7 @@ updates to these corpora, while ``reproduce/memory`` remains an unchanged histor
 For a repeatable comparison using the current layout, download memory once
 and use the same unchanged directory with
 ``--memory-profile local --memory-dir`` for every cell. Retain the files and
-record the HF commit or hashes in local experiment notes. Use ``--memory-revision <commit>`` to pin HF selection across runs.
+record the HF commit or hashes in local experiment notes. For a fixed commit, use ``hf download --revision <commit>`` and the local profile.
 Result metadata does not include a data revision identifier.
 
 The manifests describe the evaluation matrix and validation rules; the

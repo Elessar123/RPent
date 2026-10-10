@@ -72,10 +72,8 @@ def hub(monkeypatch, make_corpus):
 def test_download_isolates_models_repositories_and_commits(tmp_path, hub, monkeypatch):
     info, sync = hub
 
-    def run(version=memory.GPT5, revision=memory.MEMORY_REVISION):
-        return memory.sync_version(
-            version=version, cache_dir=tmp_path, revision=revision
-        )
+    def run(version=memory.GPT5):
+        return memory.sync_version(version=version, cache_dir=tmp_path)
 
     first = run()
     second = run(memory.ASTRA)
@@ -83,9 +81,9 @@ def test_download_isolates_models_repositories_and_commits(tmp_path, hub, monkey
     assert sync.call_args.kwargs["allow_patterns"] == ["robocasa/GPT_6_astra_high/**"]
     assert sync.call_args.kwargs["revision"] == "commit-one"
     info.return_value = SimpleNamespace(sha="commit-two")
-    third = run(revision="refs/pr/15")
+    third = run()
     assert third != first
-    assert info.call_args.kwargs["revision"] == "refs/pr/15"
+    assert info.call_args.kwargs["revision"] == "release/v0.1"
     monkeypatch.setenv("RPENT_MEMORY_HF_REPO", "owner/custom")
     assert run() != third
     assert sync.call_args.kwargs["repo_id"] == "owner/custom"
@@ -104,7 +102,7 @@ def test_resolution_failure_does_not_use_another_revision(tmp_path, hub):
     sync.reset_mock()
     info.side_effect = ConnectionError("Hub unavailable")
     with pytest.raises(ConnectionError):
-        memory.sync_version(version=memory.GPT5, cache_dir=tmp_path, revision="other")
+        memory.sync_version(version=memory.GPT5, cache_dir=tmp_path)
     sync.assert_not_called()
 
 
@@ -117,7 +115,6 @@ def args_for(tmp_path, **overrides):
         "memory_profile": "hf",
         "memory_dir": None,
         "memory_version": "auto",
-        "memory_revision": memory.MEMORY_REVISION,
         "planner": "codex",
         "model": "gpt-6-astra",
         "explore": False,
@@ -159,13 +156,12 @@ def test_local_and_exploration_do_not_download(tmp_path, monkeypatch, explore):
     assert config.prompt_vars["memory_dir"] == str(tmp_path)
 
 
-@pytest.mark.parametrize(
-    "field,value", [("memory_version", memory.ASTRA), ("memory_revision", "refs/pr/15")]
-)
 @pytest.mark.parametrize("profile,explore", [("local", False), (None, True)])
-def test_hf_selectors_reject_local_modes(tmp_path, field, value, profile, explore):
-    args = args_for(tmp_path, memory_profile=profile, explore=explore, **{field: value})
-    with pytest.raises(ValueError, match="require --memory-profile hf"):
+def test_hf_selectors_reject_local_modes(tmp_path, profile, explore):
+    args = args_for(
+        tmp_path, memory_profile=profile, explore=explore, memory_version=memory.ASTRA
+    )
+    with pytest.raises(ValueError, match="requires --memory-profile hf"):
         memory.validate_options(args)
 
 

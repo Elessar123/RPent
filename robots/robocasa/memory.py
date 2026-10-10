@@ -48,15 +48,12 @@ MEMORY_REVISION = "release/v0.1"
 
 def validate_options(args: argparse.Namespace) -> None:
     """Reject HF corpus selectors for local memory and exploration."""
-    if (
-        getattr(args, "memory_version", "auto") != "auto"
-        or getattr(args, "memory_revision", MEMORY_REVISION) != MEMORY_REVISION
-    ) and (
+    if getattr(args, "memory_version", "auto") != "auto" and (
         getattr(args, "explore", False)
         or getattr(args, "memory_profile", None) == "local"
     ):
         raise ValueError(
-            "--memory-version and --memory-revision require --memory-profile hf; "
+            "--memory-version requires --memory-profile hf; "
             "local memory and exploration use --memory-dir"
         )
 
@@ -88,7 +85,6 @@ def sync_version(
     *,
     version: str,
     cache_dir: Path,
-    revision: str = MEMORY_REVISION,
     repo_id: str = "RLinf/RPent-memory",
 ) -> Path:
     """Download a selected corpus into the Hub's repository/revision cache."""
@@ -97,7 +93,9 @@ def sync_version(
     if version not in (GPT5, ASTRA):
         raise ValueError("sync_version requires a resolved memory version")
     repo_id = os.environ.get("RPENT_MEMORY_HF_REPO", repo_id)
-    commit = HfApi().repo_info(repo_id, repo_type="dataset", revision=revision).sha
+    commit = (
+        HfApi().repo_info(repo_id, repo_type="dataset", revision=MEMORY_REVISION).sha
+    )
     prefix = f"robocasa/{version}"
     repository_key = hashlib.sha256(repo_id.encode()).hexdigest()[:20]
     destination = cache_dir / repository_key / commit
@@ -127,7 +125,6 @@ def prepare_memory(args: argparse.Namespace, config: RunConfig) -> None:
     root = sync_version(
         version=version,
         cache_dir=get_memory_dir("robocasa") / ".hub",
-        revision=getattr(args, "memory_revision", MEMORY_REVISION),
     )
     TaskMemory.load(root, args.task_name, profile="hf", split=args.split)
     config.prompt_vars.update(memory_dir=str(root), memory_version=version)

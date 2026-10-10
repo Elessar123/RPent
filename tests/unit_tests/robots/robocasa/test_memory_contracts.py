@@ -318,6 +318,9 @@ def test_memory_policy_flag_is_not_available(tmp_path):
     get_robot_spec().add_cli_args(parser, use_dashboard=False)
     args = parser.parse_args(["--task-name", "OpenDrawer"])
     assert not hasattr(args, "memory_policy")
+    assert not hasattr(args, "memory_revision")
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--task-name", "OpenDrawer", "--memory-revision", "main"])
     with pytest.raises(SystemExit):
         parser.parse_args(
             ["--task-name", "OpenDrawer", "--memory-policy", "task-specific"]
@@ -363,7 +366,6 @@ def test_cli_selects_model_memory_before_startup(tmp_path, monkeypatch):
     assert captured == {
         "version": "GPT_6_astra_high",
         "cache_dir": tmp_path / "memory/robocasa/.hub",
-        "revision": "release/v0.1",
     }
 
 

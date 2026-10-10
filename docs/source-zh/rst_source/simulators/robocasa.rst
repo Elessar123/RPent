@@ -195,7 +195,7 @@ RoboCasa 不绑定具体 planner；可使用 ``api``、``claude_code`` 或 ``cod
 
 ``--memory-version auto`` 根据实际解析出的 planner 模型选择语料；Codex 未显式指定模型时会使用 ``CODEX_MODEL``。支持 ``openai:gpt-6-astra`` 等 provider 前缀。可以通过 ``--memory-version GPT_5.5_xhigh`` 或 ``--memory-version GPT_6_astra_high`` 手动覆盖。选择语料不会改变评测模型或推理档位。
 
-``--memory-revision`` 接受分支、标签或 commit，默认是 ``release/v0.1``。每次准备时在线解析 revision，仅下载所选子树，缓存按仓库和 commit 隔离。解析或下载失败会停止准备，不会改用另一份语料或 revision。离线运行应先下载，再使用 local profile。这两个选择参数仅用于 HF 评测；本地 memory 和探索仍通过 ``--memory-dir`` 指定目录。
+HF 分支由实现固定为 ``release/v0.1``。每次准备时在线解析该分支，仅下载所选子树，缓存按仓库和 commit 隔离。解析或下载失败会停止准备，不会改用另一份语料或 revision。离线运行应先下载，再使用 local profile。``--memory-version`` 仅用于 HF 评测；本地 memory 和探索仍通过 ``--memory-dir`` 指定目录。
 
 所选语料根目录的结构为：
 
@@ -275,7 +275,7 @@ local 评测还提供 ``global/*.md``，以及 YAML frontmatter 中 ``suite: rob
 
 结果记录固定的任务/global 文件选择、缺失文件和实际读取情况。校验器允许零读取和部分读取，仍检查任务访问边界和审计结构。审计文件缺失或损坏会单独报告；是否完整读取不决定环境结果的有效性或成功值。每次运行都会重新初始化读取审计，即使复用了输出目录也不继承旧记录。
 
-校验器不比较不同运行之间的 memory 正文。HF ``release/v0.1`` 接收这些语料的更新， ``reproduce/memory`` 保持为不再变更的历史归档。使用当前布局进行可重复的对照实验时，只下载一次 memory，所有 cell 均用 ``--memory-profile local --memory-dir`` 指向同一份保持不变的目录。保留这些文件，并在本地实验记录中保存 HF commit 或哈希。可使用 ``--memory-revision <commit>`` 在多次运行之间固定 HF 选择。结果元数据不包含数据版本标识。
+校验器不比较不同运行之间的 memory 正文。HF ``release/v0.1`` 接收这些语料的更新， ``reproduce/memory`` 保持为不再变更的历史归档。使用当前布局进行可重复的对照实验时，只下载一次 memory，所有 cell 均用 ``--memory-profile local --memory-dir`` 指向同一份保持不变的目录。保留这些文件，并在本地实验记录中保存 HF commit 或哈希。需要固定 commit 时，使用 ``hf download --revision <commit>`` 下载后选择 local profile。结果元数据不包含数据版本标识。
 
 清单定义评测矩阵和校验规则，:doc:`排行榜 <../leaderboard/performance>` 展示独立报告的成绩。340 个回合本身不能证明运行使用了哪份 memory、模型或代码配置。当前 v2 清单包含 GPT-5.5 参考配置，不能直接用于校验榜单上的所有模型。
 

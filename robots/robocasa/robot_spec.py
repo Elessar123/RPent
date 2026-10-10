@@ -25,7 +25,6 @@ from typing import TYPE_CHECKING, Any
 
 from robots.robocasa.eval.result import finalize_cell_result
 from robots.robocasa.memory import (
-    MEMORY_REVISION,
     MEMORY_VERSIONS,
     RoboCasaMemoryManager,
     TaskMemory,
@@ -210,11 +209,6 @@ def _add_cli_args(parser: argparse.ArgumentParser, use_dashboard: bool) -> None:
         choices=MEMORY_VERSIONS,
         default="auto",
         help="HF memory corpus: auto selects by model; explicit versions override.",
-    )
-    parser.add_argument(
-        "--memory-revision",
-        default=MEMORY_REVISION,
-        help="HF memory branch, tag or commit (default: release/v0.1).",
     )
     required = not use_dashboard
     parser.add_argument(

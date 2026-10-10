@@ -28,6 +28,7 @@ from robots.robotwin.robot_spec import ROBOTWIN_CAMERA_NAMES
 from rpent.dashboard.events import DashboardEventSink
 from rpent.session import EnvState
 from rpent.tools import ToolResult, iter_tools, tool
+from rpent.tools.direct_action import direct_action_tool
 from rpent.tools.toolkit import Toolkit
 from rpent.utils.logging import get_output_dir
 
@@ -128,8 +129,9 @@ class RoboTwinToolkit(Toolkit):
         self._register_robotwin_tools()
         if enable_direct_action:
             self.add_tool(
-                self._primitives.env.get_direct_action_tool(
-                    partial(self._step, "execute_action")
+                direct_action_tool(
+                    self._primitives.env.action_specs,
+                    partial(self._step, "execute_action"),
                 )
             )
         initial = self.get_env_state(

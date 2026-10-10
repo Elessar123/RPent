@@ -16,14 +16,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from functools import cached_property
 from typing import Any
 
 import numpy as np
 
-from rpent.robots.components.action_spec import direct_action_tool, validate_action
-from rpent.tools import Tool, ToolResult
+from rpent.robots.components.action_spec import validate_action
 
 
 class BaseEnvClient:
@@ -57,10 +55,6 @@ class BaseEnvClient:
         return self._client.call(
             "env.get_action_spec", timeout_s=self._TIMEOUT_S["default"]
         )
-
-    def get_direct_action_tool(self, handler: Callable[..., ToolResult]) -> Tool:
-        """Describe direct actions using the connected environment's specification."""
-        return direct_action_tool(self.action_specs, handler)
 
     def validate_action(
         self, values: list[float], action_type: str | None = None

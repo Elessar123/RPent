@@ -16,14 +16,9 @@
 
 from __future__ import annotations
 
-import json
-from collections.abc import Callable
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
-from pydantic import Field, create_model
-
-from rpent.tools import Tool, ToolResult
 
 
 def box_action_spec(low: Any, high: Any, description: str) -> dict[str, Any]:
@@ -50,31 +45,3 @@ def validate_action(values: Any, spec: dict[str, Any]) -> np.ndarray:
     if (action < low).any() or (action > high).any():
         raise ValueError("action values are outside the environment's bounds")
     return action
-
-
-def direct_action_tool(
-    specs: dict[str, dict[str, Any]], handler: Callable[..., ToolResult]
-) -> Tool:
-    """Build a native tool and validator from the connected environment's layouts.
-
-    The ``default`` layout has no action_type argument. Typed environments
-    advertise their supported modes as keys, with the first mode the default.
-    """
-    sizes = [len(spec["low"]) for spec in specs.values()]
-    fields = {
-        "values": (list[float], Field(min_length=min(sizes), max_length=max(sizes)))
-    }
-    if list(specs) != ["default"]:
-        fields["action_type"] = (Literal[tuple(specs)], next(iter(specs)))
-    args_schema = create_model("DirectActionArgs", **fields)
-    return Tool(
-        name="execute_action",
-        description=(
-            "Execute one native environment action alongside VLA and scripted primitives. "
-            "Use the connected environment's layouts and per-coordinate bounds below "
-            "(null means unbounded). " + json.dumps(specs, allow_nan=False)
-        ),
-        args_schema=args_schema,
-        handler=handler,
-        _input_schema=args_schema.model_json_schema(),
-    )

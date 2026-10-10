@@ -23,8 +23,9 @@ import pytest
 
 from rpent.cli.main import _build_argparser
 from rpent.dashboard.events import NullDashboardEventSink
-from rpent.robots.components.action_spec import box_action_spec, direct_action_tool
+from rpent.robots.components.action_spec import box_action_spec
 from rpent.tools import ToolResult
+from rpent.tools.direct_action import direct_action_tool
 from rpent.utils import templates
 
 
@@ -274,7 +275,7 @@ def test_cancelled_direct_action_does_not_step(robot):
 @pytest.mark.parametrize("size", [3, 9, 20])
 def test_direct_action_uses_environment_dimensions(robot, size):
     primitive = make_primitive(robot, action_size=size)
-    tool = primitive.env.get_direct_action_tool(primitive.execute_action)
+    tool = direct_action_tool(primitive.env.action_specs, primitive.execute_action)
     values_schema = tool.input_schema["properties"]["values"]
     assert values_schema["minItems"] == values_schema["maxItems"] == size
     with pytest.raises(ValueError):
@@ -308,7 +309,7 @@ def test_direct_action_uses_per_coordinate_environment_bounds():
         sum(c.args[0] == "env.step" for c in primitive.env._client.call.call_args_list)
         == 1
     )
-    tool = primitive.env.get_direct_action_tool(primitive.execute_action)
+    tool = direct_action_tool(primitive.env.action_specs, primitive.execute_action)
     assert "Custom controller" in tool.description
     assert "Infinity" not in tool.description
 
@@ -374,7 +375,7 @@ def test_libero_prompt_matches_direct_action_enablement(
 @pytest.mark.parametrize("mode", ["delta", "absolute"])
 def test_libero_rpc_describes_active_controller(legacy, mode):
     from robots.libero.env_server import LiberoEnvFacade
-    from rpent.robots.components.action_spec import direct_action_tool
+    from rpent.tools.direct_action import direct_action_tool
 
     low, high = np.array([-2.0] * 6 + [-1.0]), np.array([2.0] * 6 + [1.0])
     arm = {
@@ -419,7 +420,7 @@ def test_libero_rpc_describes_active_controller(legacy, mode):
 @pytest.mark.parametrize("base_first", [False, True])
 def test_robocasa_rpc_describes_active_layout(base_first):
     from robots.robocasa.env_server import RoboCasaEnvFacade
-    from rpent.robots.components.action_spec import direct_action_tool
+    from rpent.tools.direct_action import direct_action_tool
 
     low, high = np.full(12, -1.0), np.full(12, 1.0)
     arm = SimpleNamespace(

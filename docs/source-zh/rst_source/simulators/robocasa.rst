@@ -198,22 +198,15 @@ HF 默认分支为 ``main``。记忆选择不会改变模型的推理档位。
      --vla-model-path /path/to/rldx --planner codex --model gpt-6-astra \
      --memory-profile hf --memory-version GPT_5.5_xhigh
 
-离线评测前，先下载所需语料，再使用本地目录：
+.. code-block:: text
 
-.. code-block:: bash
+   robocasa/<memory-version>/
+   ├── task-specific/
+   └── global/
 
-   hf download RLinf/RPent-memory --repo-type dataset \
-     --include 'robocasa/GPT_6_astra_high/**' --local-dir ./custom-memory
-   # 在运行命令中用以下参数替换 HF profile/version 参数：
-   # --memory-profile local --memory-dir ./custom-memory/robocasa/GPT_6_astra_high
+global 文件必须存在。任务记录（JSON）与动作序列（recipe）必须成对存在，也可以同时缺失。任务 Markdown 为可选文件。RPent 文件工具只开放当前任务允许读取的记忆。
 
-所选目录包含 ``task-specific/`` 和 ``global/``。global 文件必须存在；任务 JSON
-与 recipe 必须成对存在，也可以同时缺失。任务 Markdown 可选。本地模式仍支持旧的
-未分版本语料。``--memory-version`` 仅用于 HF 评测，不用于本地模式或探索。
-
-其他同布局的数据集可用 ``--memory-repo owner/dataset``；指定分支或提交可用
-``--memory-repo https://huggingface.co/datasets/owner/dataset@revision``。
-未指定 revision 时使用 ``main``。
+需要固定一份本地记忆完成评测时，使用 ``--memory-profile local --memory-dir <目录>``，下载与运行示例见 :ref:`reproduce-target50`。文件命名、本地探索产物和自定义来源见下方说明。
 
 .. dropdown:: 记忆文件选择与自定义来源
 
@@ -532,7 +525,7 @@ VLA 推理检查
 记忆读取
 ~~~~~~~~~~~~
 
-``read_text_file`` 找不到当前任务记忆时，检查 所选语料的 ``task-specific/`` 目录，以及任务名是否正确。详见 :ref:`记忆文件选择规则 <robocasa-memory-selection>`。Atomic 任务没有发布可选的 ``<Task>.md``；系统不会用其他任务的记忆替代。
+``read_text_file`` 找不到当前任务记忆时，检查所选语料的 ``task-specific/`` 目录，以及任务名是否正确。详见 :ref:`记忆文件选择规则 <robocasa-memory-selection>`。Atomic 任务没有发布可选的 ``<Task>.md``；系统不会用其他任务的记忆替代。
 
 实现说明
 ------------

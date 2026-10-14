@@ -224,26 +224,22 @@ reasoning effort. Override the corpus with ``--memory-version``:
      --vla-model-path /path/to/rldx --planner codex --model gpt-6-astra \
      --memory-profile hf --memory-version GPT_5.5_xhigh
 
-For offline evaluation, download the desired corpus once, then select its
-local directory:
+.. code-block:: text
 
-.. code-block:: bash
+   robocasa/<memory-version>/
+   ├── task-specific/
+   └── global/
 
-   hf download RLinf/RPent-memory --repo-type dataset \
-     --include 'robocasa/GPT_6_astra_high/**' --local-dir ./custom-memory
-   # Add to your run command instead of the HF profile/version options:
-   # --memory-profile local --memory-dir ./custom-memory/robocasa/GPT_6_astra_high
-
-The selected directory contains ``task-specific/`` and ``global/``. Global
-memory is required; task JSON and recipe must both exist or both be absent.
-Task Markdown is optional. Local mode also accepts older unversioned corpora.
-``--memory-version`` applies only to HF evaluation, not local mode or exploration.
+Global memory is required. Task JSON and recipe must both exist or both be
+absent; task Markdown is optional. RPent file tools expose only the memory
+allowed for the current task.
 
 .. _custom-memory-sources:
 
-Use ``--memory-repo owner/dataset`` for another dataset with the same layout,
-or ``--memory-repo https://huggingface.co/datasets/owner/dataset@revision``
-for a branch or commit. The source defaults to ``main`` when no revision is given.
+To evaluate with a fixed local copy, use
+``--memory-profile local --memory-dir <directory>``; download and run commands
+are in :ref:`reproduce-target50`. Expand the details below for filenames,
+local exploration output and custom sources.
 
 .. dropdown:: Memory File Selection and Custom Sources
 

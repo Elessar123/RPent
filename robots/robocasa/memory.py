@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -29,7 +28,8 @@ from typing import Any
 from rpent.evaluation import write_json_atomic
 from rpent.memory import MemoryManager
 from rpent.memory.manager import _split_frontmatter, _validate
-from rpent.planner.base import resolve_model
+from rpent.memory.model import select_model_version, validate_options
+from rpent.memory.source import prepare_explicit_source
 from rpent.robots.robot_spec import RunConfig
 from rpent.utils.config import get_memory_dir, get_repo_root
 from rpent.utils.logging import get_logger
@@ -43,70 +43,35 @@ _SPLIT_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_-]*\Z")
 GPT5 = "GPT_5.5_xhigh"
 ASTRA = "GPT_6_astra_high"
 MEMORY_VERSIONS = ("auto", GPT5, ASTRA)
-MEMORY_REVISION = "release/v0.1"
-
-
-def validate_options(args: argparse.Namespace) -> None:
-    """Reject HF corpus selectors for local memory and exploration."""
-    if getattr(args, "memory_version", "auto") != "auto" and (
-        getattr(args, "explore", False)
-        or getattr(args, "memory_profile", None) == "local"
-    ):
-        raise ValueError(
-            "--memory-version requires --memory-profile hf; "
-            "local memory and exploration use --memory-dir"
-        )
+MODEL_VERSIONS = {"gpt-5.5": GPT5, "gpt-6-astra": ASTRA}
 
 
 def select_version(
     version: str = "auto", *, model: str | None = None, planner: str = "api"
 ) -> str:
     """Select the corpus independently of the evaluation reasoning effort."""
-    if version not in MEMORY_VERSIONS:
-        raise ValueError(f"Unknown memory version: {version!r}")
-    if version != "auto":
-        return version
-    resolved = resolve_model(planner, model)
-    name = resolved.rsplit(":", 1)[-1].lower() if resolved else ""
-    selected = {"gpt-5.5": GPT5, "gpt-6-astra": ASTRA}.get(name)
-    if selected:
-        return selected
-    logger.warning(
-        "No memory mapping for model %r (%s); using %s. "
-        "Use --memory-version to select explicitly.",
-        resolved,
-        planner,
-        GPT5,
+    return select_model_version(
+        version,
+        model=model,
+        planner=planner,
+        model_versions=MODEL_VERSIONS,
+        default_version=GPT5,
     )
-    return GPT5
 
 
 def sync_version(
     *,
     version: str,
     cache_dir: Path,
-    repo_id: str = "RLinf/RPent-memory",
+    repo_id: str | None = None,
 ) -> Path:
-    """Download a selected corpus into the Hub's repository/revision cache."""
-    from huggingface_hub import HfApi, snapshot_download
-
+    """Download the selected corpus from the requested HF source (default main)."""
     if version not in (GPT5, ASTRA):
         raise ValueError("sync_version requires a resolved memory version")
-    repo_id = os.environ.get("RPENT_MEMORY_HF_REPO", repo_id)
-    commit = (
-        HfApi().repo_info(repo_id, repo_type="dataset", revision=MEMORY_REVISION).sha
+    source = repo_id or os.environ.get("RPENT_MEMORY_HF_REPO", "RLinf/RPent-memory")
+    root = prepare_explicit_source(
+        source, "robocasa", version=version, cache_dir=cache_dir
     )
-    prefix = f"robocasa/{version}"
-    repository_key = hashlib.sha256(repo_id.encode()).hexdigest()[:20]
-    destination = cache_dir / repository_key / commit
-    snapshot_download(
-        repo_id=repo_id,
-        repo_type="dataset",
-        revision=commit,
-        local_dir=str(destination),
-        allow_patterns=[f"{prefix}/**"],
-    )
-    root = destination / prefix
     TaskMemory.load(root, None, profile="hf")
     return root
 
@@ -124,6 +89,7 @@ def prepare_memory(args: argparse.Namespace, config: RunConfig) -> None:
     )
     root = sync_version(
         version=version,
+        repo_id=getattr(args, "memory_repo", None),
         cache_dir=get_memory_dir("robocasa") / ".hub",
     )
     TaskMemory.load(root, args.task_name, profile="hf", split=args.split)

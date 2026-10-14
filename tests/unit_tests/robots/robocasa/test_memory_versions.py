@@ -50,60 +50,59 @@ def test_codex_default_model(monkeypatch):
 
 
 @pytest.fixture
-def hub(monkeypatch, make_corpus):
+def hub(monkeypatch, make_corpus, tmp_path):
     monkeypatch.delenv("RPENT_MEMORY_HF_REPO", raising=False)
-    info = Mock(return_value=SimpleNamespace(sha="commit-one"))
-    monkeypatch.setattr(
-        huggingface_hub, "HfApi", lambda: SimpleNamespace(repo_info=info)
-    )
+    state = SimpleNamespace(commit="a" * 40)
 
     def download(**kwargs):
-        from pathlib import Path
-
         prefix = kwargs["allow_patterns"][0].removesuffix("/**")
-        make_corpus(Path(kwargs["local_dir"]) / prefix)
-        return kwargs["local_dir"]
+        snapshot = tmp_path / "hub" / state.commit
+        make_corpus(snapshot / prefix)
+        return str(snapshot)
 
     sync = Mock(side_effect=download)
     monkeypatch.setattr(huggingface_hub, "snapshot_download", sync)
-    return info, sync
+    return state, sync
 
 
 def test_download_isolates_models_repositories_and_commits(tmp_path, hub, monkeypatch):
-    info, sync = hub
+    state, sync = hub
 
-    def run(version=memory.GPT5):
-        return memory.sync_version(version=version, cache_dir=tmp_path)
+    def run(version=memory.GPT5, **kwargs):
+        return memory.sync_version(
+            version=version, cache_dir=tmp_path / "copies", **kwargs
+        )
 
     first = run()
     second = run(memory.ASTRA)
     assert first != second
     assert sync.call_args.kwargs["allow_patterns"] == ["robocasa/GPT_6_astra_high/**"]
-    assert sync.call_args.kwargs["revision"] == "commit-one"
-    info.return_value = SimpleNamespace(sha="commit-two")
+    assert sync.call_args.kwargs["revision"] == "main"
+    state.commit = "b" * 40
     third = run()
     assert third != first
-    assert info.call_args.kwargs["revision"] == "release/v0.1"
     monkeypatch.setenv("RPENT_MEMORY_HF_REPO", "owner/custom")
     assert run() != third
     assert sync.call_args.kwargs["repo_id"] == "owner/custom"
+    run(repo_id="owner/explicit@release/v2")
+    assert sync.call_args.kwargs["repo_id"] == "owner/explicit"
+    assert sync.call_args.kwargs["revision"] == "release/v2"
 
 
 def test_missing_selected_corpus_does_not_use_legacy_root(tmp_path, hub, make_corpus):
     _, sync = hub
-    sync.side_effect = lambda **kw: make_corpus(tmp_path / "robocasa")
-    with pytest.raises(ValueError, match="directory not found"):
-        memory.sync_version(version=memory.ASTRA, cache_dir=tmp_path)
+    make_corpus(tmp_path / "robocasa")
+    sync.side_effect = lambda **kw: str(tmp_path)
+    with pytest.raises(ValueError, match="no robocasa/GPT_6_astra_high"):
+        memory.sync_version(version=memory.ASTRA, cache_dir=tmp_path / "copies")
 
 
 def test_resolution_failure_does_not_use_another_revision(tmp_path, hub):
-    info, sync = hub
-    memory.sync_version(version=memory.GPT5, cache_dir=tmp_path)
-    sync.reset_mock()
-    info.side_effect = ConnectionError("Hub unavailable")
+    _, sync = hub
+    memory.sync_version(version=memory.GPT5, cache_dir=tmp_path / "copies")
+    sync.side_effect = ConnectionError("Hub unavailable")
     with pytest.raises(ConnectionError):
-        memory.sync_version(version=memory.GPT5, cache_dir=tmp_path)
-    sync.assert_not_called()
+        memory.sync_version(version=memory.GPT5, cache_dir=tmp_path / "copies")
 
 
 def args_for(tmp_path, **overrides):
@@ -115,6 +114,7 @@ def args_for(tmp_path, **overrides):
         "memory_profile": "hf",
         "memory_dir": None,
         "memory_version": "auto",
+        "memory_repo": None,
         "planner": "codex",
         "model": "gpt-6-astra",
         "explore": False,

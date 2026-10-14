@@ -141,9 +141,7 @@ def test_all_50_tasks_share_prompt_and_tool_selection(tmp_path, make_corpus):
     from robots.robocasa.robot_spec import get_robot_spec
 
     manifest = json.loads(
-        (
-            Path(__file__).parents[4] / "robots/robocasa/eval/target50_v2.json"
-        ).read_text()
+        (Path(__file__).parents[4] / "robots/robocasa/eval/target50.json").read_text()
     )
     tasks = [task for split in manifest["splits"].values() for task in split["tasks"]]
     provided = tasks[::2]
@@ -330,7 +328,8 @@ def test_memory_policy_flag_is_not_available(tmp_path):
     assert "memory_revision" not in config.prompt_vars
 
 
-def test_cli_selects_model_memory_before_startup(tmp_path, monkeypatch):
+@pytest.mark.parametrize("source", [None, "owner/memory@release/v2"])
+def test_cli_selects_model_memory_before_startup(tmp_path, monkeypatch, source):
     from rpent.cli import main as cli
 
     class SyncCaptured(Exception):
@@ -360,12 +359,15 @@ def test_cli_selects_model_memory_before_startup(tmp_path, monkeypatch):
         str(tmp_path / "run"),
     ]
     argv.extend(["--model", "gpt-6-astra"])
+    if source:
+        argv.extend(["--memory-repo", source])
     monkeypatch.setattr(sys, "argv", argv)
     with pytest.raises(SyncCaptured):
         cli.main()
     assert captured == {
         "version": "GPT_6_astra_high",
         "cache_dir": tmp_path / "memory/robocasa/.hub",
+        "repo_id": source,
     }
 
 
